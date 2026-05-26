@@ -1,0 +1,23 @@
+{
+	"name": "obsidian-tasktodo",
+	"version": "0.1.0-alpha.1",
+	"description": "A task planning and today view powered by TaskLite Core.",
+	"main": "main.js",
+	"type": "module",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+	},
+	"keywords": [],
+	"license": "0-BSD",
+	"devDependencies": {
+		"esbuild": "0.25.5",
+		"typescript": "^5.9.3",
+		"tslib": "2.4.0",
+		"@types/node": "^16.18.126"
+	},
+	"dependencies": {
+		"obsidian": "latest",
+		"@codemirror/view": "^6.43.0"
+	}
+}
