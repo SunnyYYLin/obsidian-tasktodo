@@ -30,6 +30,6 @@ export default class TaskTodoPlugin extends Plugin {
 		const leaves = this.app.workspace.getLeavesOfType(TASKTODO_VIEW);
 		const leaf = leaves[0] ?? this.app.workspace.getLeaf("tab");
 		await leaf.setViewState({type: TASKTODO_VIEW, active: true});
-		this.app.workspace.revealLeaf(leaf);
+		await this.app.workspace.revealLeaf(leaf);
 	}
 }

@@ -53,7 +53,7 @@ export class TaskTodoTaskListView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return "TaskTodo";
+		return "TaskTodo"; // eslint-disable-line obsidianmd/ui/sentence-case
 	}
 
 	getIcon(): string {
@@ -117,8 +117,8 @@ export class TaskTodoTaskListView extends ItemView {
 		const addIcon = addButton.createSpan();
 		setIcon(addIcon, "plus");
 		addButton.createSpan({text: t("taskTodo.addTask")});
-		addButton.addEventListener("click", async () => {
-			await this.createInboxTask();
+		addButton.addEventListener("click", () => {
+			void this.createInboxTask();
 		});
 	}
 
@@ -171,13 +171,15 @@ export class TaskTodoTaskListView extends ItemView {
 		const checkbox = row.createEl("button", {cls: "taskslite-list-checkbox", attr: {"aria-label": t("task.action.complete")}});
 		const checkboxIcon = checkbox.createSpan({cls: "taskslite-list-checkbox-icon"});
 		applyTaskStatusIcon(checkboxIcon, item.task.status.type);
-		checkbox.addEventListener("click", async (event) => {
+		checkbox.addEventListener("click", (event) => {
 			event.preventDefault();
 			event.stopPropagation();
 			checkbox.setAttr("disabled", "true");
-			if (item.task.status.type === "DONE") await this.host.api.unfinishTask(item.path, item.lineNumber);
-			else await this.host.api.finishTask(item.path, item.lineNumber);
-			await this.render();
+			void (async () => {
+				if (item.task.status.type === "DONE") await this.host.api.unfinishTask(item.path, item.lineNumber);
+				else await this.host.api.finishTask(item.path, item.lineNumber);
+				await this.render();
+			})();
 		});
 
 		const body = row.createDiv({cls: "taskslite-list-item-body"});
@@ -185,8 +187,8 @@ export class TaskTodoTaskListView extends ItemView {
 		this.renderItemMeta(body, item);
 		this.renderItemActions(row, item);
 
-		row.addEventListener("click", async () => {
-			await this.editTask(item);
+		row.addEventListener("click", () => {
+			void this.editTask(item);
 		});
 
 		if (item.hasChildren && this.expandedTasks.has(taskKey(item))) {
@@ -239,20 +241,22 @@ export class TaskTodoTaskListView extends ItemView {
 		const actions = row.createDiv({cls: "taskslite-list-actions"});
 		const addSubtaskButton = actions.createEl("button", {cls: "taskslite-list-action", attr: {"aria-label": t("task.action.addSubtask")}});
 		setIcon(addSubtaskButton, "list-plus");
-		addSubtaskButton.addEventListener("click", async (event) => {
+		addSubtaskButton.addEventListener("click", (event) => {
 			event.preventDefault();
 			event.stopPropagation();
-			await this.createSubtask(item);
+			void this.createSubtask(item);
 		});
 		const cancelButton = actions.createEl("button", {cls: "taskslite-list-action", attr: {"aria-label": t("task.action.cancel")}});
 		setIcon(cancelButton, item.task.status.type === "CANCELLED" ? "rotate-ccw" : "circle-slash");
-		cancelButton.addEventListener("click", async (event) => {
+		cancelButton.addEventListener("click", (event) => {
 			event.preventDefault();
 			event.stopPropagation();
 			cancelButton.setAttr("disabled", "true");
-			if (item.task.status.type === "CANCELLED") await this.host.api.uncancelTask(item.path, item.lineNumber);
-			else await this.host.api.cancelTask(item.path, item.lineNumber);
-			await this.render();
+			void (async () => {
+				if (item.task.status.type === "CANCELLED") await this.host.api.uncancelTask(item.path, item.lineNumber);
+				else await this.host.api.cancelTask(item.path, item.lineNumber);
+				await this.render();
+			})();
 		});
 	}
 
