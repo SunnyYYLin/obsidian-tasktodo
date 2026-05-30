@@ -96,15 +96,17 @@ class TaskLineModal extends Modal {
 			this.addParentTaskSetting(this.contentEl, this.options.parentTask);
 		}
 
-		new Setting(this.contentEl).setName(t("modal.status")).setClass("taskslite-modal-setting-compact").addDropdown((dropdown) => {
-			dropdown.selectEl.addClass("taskslite-modal-compact-control");
-			for (const status of modalStatuses(this.options.settings, this.options.registry)) {
-				dropdown.addOption(status.symbol, statusOptionLabel(status));
-			}
-			dropdown.setValue(this.fields.statusSymbol).onChange((value) => {
-				this.fields.statusSymbol = value;
+		if (!this.isCreateMode) {
+			new Setting(this.contentEl).setName(t("modal.status")).setClass("taskslite-modal-setting-compact").addDropdown((dropdown) => {
+				dropdown.selectEl.addClass("taskslite-modal-compact-control");
+				for (const status of modalStatuses(this.options.settings, this.options.registry)) {
+					dropdown.addOption(status.symbol, statusOptionLabel(status));
+				}
+				dropdown.setValue(this.fields.statusSymbol).onChange((value) => {
+					this.fields.statusSymbol = value;
+				});
 			});
-		});
+		}
 
 		this.addPrioritySetting(this.contentEl);
 		this.addDateSetting(`${TASK_SYMBOLS.start} ${t("modal.startDate")}`, "start");
@@ -115,12 +117,11 @@ class TaskLineModal extends Modal {
 			this.addDateSetting(`${TASK_SYMBOLS.done} ${t("modal.doneDate")}`, "done");
 			this.addDateSetting(`${TASK_SYMBOLS.cancelled} ${t("modal.cancelledDate")}`, "cancelled");
 		}
-		const advanced = this.addAdvancedDetails();
-		this.addRecurrenceSetting(advanced);
-		this.addOnCompletionSetting(advanced);
-		this.addTextSetting(advanced, `${TASK_SYMBOLS.id} ${t("modal.taskId")}`, "id", "id");
-		this.addTextSetting(advanced, `${TASK_SYMBOLS.dependsOn} ${t("modal.dependsOn")}`, "id1, id2", "dependsOn");
-		this.addTextSetting(advanced, t("modal.blockLink"), "^block-id", "blockLink");
+		this.addRecurrenceSetting(this.contentEl);
+		this.addOnCompletionSetting(this.contentEl);
+		this.addTextSetting(this.contentEl, `${TASK_SYMBOLS.id} ${t("modal.taskId")}`, "id", "id");
+		this.addTextSetting(this.contentEl, `${TASK_SYMBOLS.dependsOn} ${t("modal.dependsOn")}`, "id1, id2", "dependsOn");
+		this.addTextSetting(this.contentEl, t("modal.blockLink"), "^block-id", "blockLink");
 
 		new Setting(this.contentEl)
 			.addButton((button) =>
@@ -245,12 +246,6 @@ class TaskLineModal extends Modal {
 			});
 	}
 
-	private addAdvancedDetails(): HTMLElement {
-		const details = this.contentEl.createEl("details", {cls: "taskslite-modal-advanced"});
-		if (hasAdvancedFields(this.fields)) details.open = true;
-		details.createEl("summary", {text: t("modal.advanced")});
-		return details.createDiv({cls: "taskslite-modal-advanced-content"});
-	}
 
 	private addOnCompletionSetting(container: HTMLElement): void {
 		new Setting(container).setName(`${TASK_SYMBOLS.onCompletion} ${t("modal.onCompletion")}`).setClass("taskslite-modal-setting-compact").addDropdown((dropdown) => {
@@ -411,9 +406,6 @@ function statusOptionLabel(status: StatusConfiguration): string {
 	return `${symbol} ${status.name}`;
 }
 
-function hasAdvancedFields(fields: TaskLineFields): boolean {
-	return Boolean(fields.recurrence || fields.onCompletion || fields.id || fields.dependsOn || fields.blockLink);
-}
 
 function targetFileOptions(app: App, basePath: string): string[] {
 	const prefix = normalizeFolderPath(basePath);

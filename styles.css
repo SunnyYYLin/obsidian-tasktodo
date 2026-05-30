@@ -480,3 +480,92 @@
 		margin-left: 2.25rem;
 	}
 }
+
+/* Drag-and-drop / sort setting container and items */
+.tasktodo-sort-container {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	margin-top: 1rem;
+	padding: 0.5rem;
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: 6px;
+	background: var(--background-primary-alt);
+}
+
+.tasktodo-sort-item {
+	display: flex;
+	align-items: center;
+	padding: 0.5rem 0.75rem;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	cursor: grab;
+	user-select: none;
+	transition: background-color 0.1s ease, border-color 0.1s ease;
+}
+
+.tasktodo-sort-item:hover {
+	background: var(--background-secondary);
+	border-color: var(--interactive-accent);
+}
+
+.tasktodo-sort-item.is-dragging {
+	opacity: 0.4;
+	border-style: dashed;
+	background: var(--background-secondary-alt);
+}
+
+.tasktodo-sort-item-handle {
+	color: var(--text-muted);
+	margin-right: 0.75rem;
+	cursor: grab;
+	font-weight: bold;
+	font-size: 1.1rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.tasktodo-sort-item-handle:active {
+	cursor: grabbing;
+}
+
+.tasktodo-sort-item-title {
+	flex-grow: 1;
+	font-size: 0.9rem;
+	color: var(--text-normal);
+	font-weight: 500;
+}
+
+.tasktodo-sort-item-actions {
+	display: flex;
+	gap: 0.25rem;
+}
+
+.tasktodo-sort-item-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.5rem;
+	height: 1.5rem;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	border-radius: 4px;
+	transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.tasktodo-sort-item-btn:hover {
+	background: var(--background-secondary-alt);
+	color: var(--text-normal);
+}
+
+.tasktodo-sort-item-btn:disabled {
+	opacity: 0.25;
+	cursor: not-allowed;
+	color: var(--text-muted) !important;
+}
+

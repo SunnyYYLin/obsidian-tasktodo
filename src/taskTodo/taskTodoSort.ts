@@ -11,30 +11,7 @@ export interface TaskTodoSortableItem {
 
 export type SortKey = "date" | "importance" | "cancelled" | "lifeLength";
 
-export function parseSortOrderSetting(settingValue: string): SortKey[] {
-	const keys: SortKey[] = [];
-	const parts = settingValue.split(/[,，]/);
-	for (const part of parts) {
-		const trimmed = part.trim().toLowerCase();
-		if (trimmed === "date" || trimmed === "日期") {
-			keys.push("date");
-		} else if (trimmed === "importance" || trimmed === "priority" || trimmed === "重要性") {
-			keys.push("importance");
-		} else if (trimmed === "cancelled" || trimmed === "是否取消") {
-			keys.push("cancelled");
-		} else if (trimmed === "lifelength" || trimmed === "length" || trimmed === "生命长度") {
-			keys.push("lifeLength");
-		}
-	}
-	const defaultKeys: SortKey[] = ["date", "cancelled", "importance", "lifeLength"];
-	const finalKeys = Array.from(new Set(keys));
-	for (const defaultKey of defaultKeys) {
-		if (!finalKeys.includes(defaultKey)) {
-			finalKeys.push(defaultKey);
-		}
-	}
-	return finalKeys;
-}
+
 
 export function compareTaskTodoItems(
 	left: TaskTodoSortableItem,

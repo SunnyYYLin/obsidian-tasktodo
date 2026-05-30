@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { compareTaskTodoItems, getLifeLength, getTaskDateValue, parseSortOrderSetting, type TaskTodoSortableItem } from "../src/taskTodo/taskTodoSort";
+import { compareTaskTodoItems, getLifeLength, getTaskDateValue, type TaskTodoSortableItem } from "../src/taskTodo/taskTodoSort";
 import { TASK_SYMBOLS } from "../src/taskLiteInterop";
 
 function makeItem(overrides: Partial<TaskTodoSortableItem> = {}): TaskTodoSortableItem {
@@ -42,13 +42,6 @@ function makeItem(overrides: Partial<TaskTodoSortableItem> = {}): TaskTodoSortab
 	};
 }
 
-describe("parseSortOrderSetting", () => {
-	test("解析中文/英文排序设置", () => {
-		expect(parseSortOrderSetting("日期, 是否取消, 重要性, 生命长度")).toEqual(["date", "cancelled", "importance", "lifeLength"]);
-		expect(parseSortOrderSetting("importance, cancelled")).toEqual(["importance", "cancelled", "date", "lifeLength"]);
-		expect(parseSortOrderSetting("生命长度，重要性")).toEqual(["lifeLength", "importance", "date", "cancelled"]);
-	});
-});
 
 describe("getTaskDateValue 和 getLifeLength", () => {
 	test("getTaskDateValue 取 due 和 scheduled 中较小的", () => {

@@ -1,7 +1,7 @@
 import { ItemView, Modal, Notice, Setting, setIcon, type App, type TFile, type WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
 import { TASK_SYMBOLS, serializeTaskLine, todayString, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord } from "../taskLiteInterop";
-import { compareTaskTodoItems, parseSortOrderSetting } from "./taskTodoSort";
+import { compareTaskTodoItems, type SortKey } from "./taskTodoSort";
 import type TaskTodoPlugin from "../main";
 import { openTaskLineModal as openLocalTaskLineModal } from "./taskLineModal";
 
@@ -335,7 +335,7 @@ export class TaskTodoTaskListView extends ItemView {
 			includeCancelled: true,
 		});
 		const items = taskRecordsToListItems(records).filter(isVisibleTask);
-		const sortKeys = parseSortOrderSetting(this.plugin.settings.sortOrderSetting);
+		const sortKeys = this.plugin.settings.sortOrder;
 		return items.sort((a, b) => compareTaskTodoItems(a, b, sortKeys));
 	}
 

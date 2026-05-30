@@ -58,7 +58,12 @@ const messages = {
 		"taskTodo.hideCompleted": "Hide completed",
 		"settings.title": "TaskTodo Settings",
 		"settings.sortOrder.name": "Sort Order",
-		"settings.sortOrder.desc": "Order of fields to sort tasks by, separated by commas (supports: Date, Is cancelled, Importance, Life length). Default: Date, Is cancelled, Importance, Life length.",
+		"settings.sortOrder.desc": "Order of fields to sort tasks by. Drag to reorder, or use the buttons on the right. Reset to default using the button above.",
+		"settings.sortKey.date": "Date",
+		"settings.sortKey.cancelled": "Is cancelled",
+		"settings.sortKey.importance": "Importance",
+		"settings.sortKey.lifeLength": "Life length",
+		"common.reset": "Reset to default",
 	},
 	zh: {
 		"common.cancel": "取消",
@@ -119,7 +124,12 @@ const messages = {
 		"taskTodo.hideCompleted": "隐藏已完成",
 		"settings.title": "TaskTodo 设置",
 		"settings.sortOrder.name": "排序方式",
-		"settings.sortOrder.desc": "任务排序字段的优先级顺序，用逗号分隔（支持：日期、是否取消、重要性、生命长度）。默认值：日期, 是否取消, 重要性, 生命长度",
+		"settings.sortOrder.desc": "任务排序字段的优先级顺序。您可以拖拽项目来调整顺序，或者使用右侧的按钮。使用上方的按钮可以恢复为默认顺序。",
+		"settings.sortKey.date": "日期",
+		"settings.sortKey.cancelled": "是否取消",
+		"settings.sortKey.importance": "重要性",
+		"settings.sortKey.lifeLength": "生命长度",
+		"common.reset": "重置为默认值",
 	},
 } as const;
 
