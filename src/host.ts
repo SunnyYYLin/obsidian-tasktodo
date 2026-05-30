@@ -45,6 +45,7 @@ export interface TaskTodoCoreApi {
 	cancelTask(path: string, lineNumber: number): Promise<boolean>;
 	uncancelTask(path: string, lineNumber: number): Promise<boolean>;
 	createTask(line: string, options?: {path?: string; parentLineNumber?: number}): Promise<void>;
+	executeTasksToggleCommand(line: string, path: string): string;
 }
 
 export interface TaskTodoHost {

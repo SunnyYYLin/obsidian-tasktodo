@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: TaskTodoSettings = {
 export default class TaskTodoPlugin extends Plugin {
 	private host: TaskTodoHost | null = null;
 	settings!: TaskTodoSettings;
+	private originalTasksApi: unknown = null;
 
 	async onload(): Promise<void> {
 		this.host = getTaskLiteHost(this.app);
@@ -24,6 +25,32 @@ export default class TaskTodoPlugin extends Plugin {
 		}
 
 		await this.loadSettings();
+
+		this.originalTasksApi = (window as any).TasksPluginApi;
+		(window as any).TasksPluginApi = {
+			getApi: (version: string) => {
+				if (version !== "v1") return undefined;
+				return {
+					isTasksPluginEnabled: () => true,
+					createTaskLineModal: () => {
+						return this.openTaskLineModal({
+							title: t("command.createTask"),
+							initialLine: "",
+						});
+					},
+					editTaskLineModal: (taskLine: string) => {
+						return this.openTaskLineModal({
+							title: t("command.editTask"),
+							initialLine: taskLine,
+						});
+					},
+					executeToggleTaskDoneCommand: (line: string, path: string) => {
+						if (!this.host) return line;
+						return this.host.api.executeTasksToggleCommand(line, path);
+					},
+				};
+			},
+		};
 
 		this.registerView(TASKTODO_VIEW, (leaf) => new TaskTodoTaskListView(leaf, this.app, this.host!, this));
 		this.addRibbonIcon("list-todo", t("command.openTaskTodo"), () => {
@@ -191,6 +218,12 @@ export default class TaskTodoPlugin extends Plugin {
 			return;
 		}
 		await this.editTaskInEditor(editor);
+	}
+
+	onunload(): void {
+		if (this.originalTasksApi !== undefined) {
+			(window as any).TasksPluginApi = this.originalTasksApi;
+		}
 	}
 }
 
