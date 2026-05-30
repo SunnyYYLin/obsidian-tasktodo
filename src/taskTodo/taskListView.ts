@@ -342,11 +342,11 @@ export class TaskTodoTaskListView extends ItemView {
 	private async createInboxTask(): Promise<void> {
 		const result = await openTaskLineModalWithTargetHelper(this.host, this.appRef, "", t("taskTodo.createTask"), {
 			basePath: "",
-			defaultValue: "Tasks/New_Tasks",
+			defaultValue: "Tasks",
 		});
 		if (!result || !result.line) return;
 		try {
-			await this.host.api.createTask(result.line, {path: result.targetPath || "Tasks/New_Tasks.md"});
+			await this.host.api.createTask(result.line, {path: result.targetPath || "Tasks.md"});
 		} catch (error) {
 			new Notice(t("notice.inboxPathFolder"));
 			console.warn("TaskTodo failed to create inbox task", error);

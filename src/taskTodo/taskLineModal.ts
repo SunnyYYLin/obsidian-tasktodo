@@ -423,7 +423,7 @@ function targetFileOptions(app: App, basePath: string): string[] {
 
 function targetFilePath(basePath: string, value: string): string {
 	const prefix = normalizeFolderPath(basePath);
-	const trimmed = value.trim() || "New_Tasks";
+	const trimmed = value.trim() || "Tasks";
 	const withoutLeadingSlash = trimmed.replace(/^\/+/u, "");
 	const withExtension = withoutLeadingSlash.toLowerCase().endsWith(".md") ? withoutLeadingSlash : `${withoutLeadingSlash}.md`;
 	if (!prefix) {
