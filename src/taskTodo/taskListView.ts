@@ -3,6 +3,7 @@ import { t } from "../i18n";
 import { TASK_SYMBOLS, serializeTaskLine, todayString, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord } from "../taskLiteInterop";
 import { compareTaskTodoItems, parseSortOrderSetting } from "./taskTodoSort";
 import type TaskTodoPlugin from "../main";
+import { openTaskLineModal as openLocalTaskLineModal } from "./taskLineModal";
 
 export const TASKTODO_VIEW = "tasktodo-task-list";
 
@@ -555,56 +556,11 @@ function applyTaskStatusIcon(container: HTMLElement, statusType: string): void {
 }
 
 function openTaskLineModal(host: TaskTodoHost, app: App, initialLine: string, title: string): Promise<string> {
-	if (host.modalApi?.openTaskLineModal) {
-		return host.modalApi.openTaskLineModal({title, initialLine});
-	}
-	return new Promise((resolve) => new QuickTaskLineModal(app, title, initialLine, resolve).open());
-}
-
-class QuickTaskLineModal extends Modal {
-	private value: string;
-	private resolved = false;
-
-	constructor(
-		app: App,
-		private readonly titleText: string,
-		initialLine: string,
-		private readonly resolveValue: (value: string) => void,
-	) {
-		super(app);
-		this.value = initialLine;
-	}
-
-	onOpen(): void {
-		this.setTitle(this.titleText);
-		new Setting(this.contentEl).setName(t("modal.name")).addTextArea((text) => {
-			text.setValue(this.value).setPlaceholder(t("modal.taskNamePlaceholder")).onChange((value) => {
-				this.value = value;
-			});
-			text.inputEl.rows = 6;
-			window.setTimeout(() => text.inputEl.focus(), 0);
-		});
-		new Setting(this.contentEl)
-			.addButton((button) =>
-				button.setButtonText(t("common.cancel")).onClick(() => {
-					this.finish("");
-				}),
-			)
-			.addButton((button) =>
-				button.setButtonText(t("common.save")).setCta().onClick(() => {
-					this.finish(this.value.trim());
-				}),
-			);
-	}
-
-	onClose(): void {
-		this.finish("");
-	}
-
-	private finish(value: string): void {
-		if (this.resolved) return;
-		this.resolved = true;
-		this.resolveValue(value);
-		this.close();
-	}
+	return openLocalTaskLineModal({
+		app,
+		title,
+		initialLine,
+		registry: host.statusRegistry as any,
+		settings: host.settings as any,
+	});
 }
