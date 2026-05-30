@@ -71,7 +71,8 @@ class TaskLineModal extends Modal {
 		super(options.app);
 		this.fields = fieldsFromTaskLine(options.initialLine, options.registry);
 		this.isCreateMode = options.initialLine.trim() === "";
-		this.targetFileValue = "";
+		this.targetFileValue = options.targetFile?.defaultValue || "";
+		this.parentTaskValue = "";
 		if (options.parentTask?.initialValue) {
 			this.parentTaskValue = serializeParentTaskValue(options.parentTask.initialValue.path, options.parentTask.initialValue.lineNumber);
 		}
@@ -151,7 +152,6 @@ class TaskLineModal extends Modal {
 	private addTargetFileSetting(container: HTMLElement, options: TaskLineModalTargetFileOptions): void {
 		const values = targetFileOptions(this.app, options.basePath);
 		let input: TextComponent | null = null;
-		let manualInput = false;
 		new Setting(container).setName(t("modal.file")).addText((text) => {
 			input = text;
 			text.inputEl.readOnly = true;
@@ -160,16 +160,12 @@ class TaskLineModal extends Modal {
 			text.inputEl.setAttr("autocorrect", "off");
 			text.inputEl.setAttr("autocapitalize", "none");
 			text.inputEl.setAttr("spellcheck", "false");
-			text.setPlaceholder(options.defaultValue).onChange((value) => {
-				this.targetFileValue = value;
-			});
+			text.setValue(this.targetFileValue);
 			text.inputEl.addEventListener("click", () => {
-				if (!manualInput) {
-					new TargetFileSuggestModal(this.app, values, input?.getValue() ?? "", (value) => {
-						this.targetFileValue = value;
-						input?.setValue(value);
-					}).open();
-				}
+				new TargetFileSuggestModal(this.app, values, input?.getValue() ?? "", (value) => {
+					this.targetFileValue = value;
+					input?.setValue(value);
+				}).open();
 			});
 		}).addExtraButton((button) => {
 			button
@@ -180,19 +176,6 @@ class TaskLineModal extends Modal {
 						this.targetFileValue = value;
 						input?.setValue(value);
 					}).open();
-				});
-		}).addExtraButton((button) => {
-			button
-				.setIcon("pencil")
-				.setTooltip(t("modal.editFilePath"))
-				.onClick(() => {
-					manualInput = !manualInput;
-					if (input) {
-						input.inputEl.readOnly = !manualInput;
-						input.inputEl.toggleClass("taskslite-file-input-manual", manualInput);
-						if (manualInput) input.inputEl.focus();
-						else input.inputEl.blur();
-					}
 				});
 		});
 	}
@@ -338,15 +321,34 @@ class TargetFileSuggestModal extends SuggestModal<string> {
 	getSuggestions(query: string): string[] {
 		const normalized = query.trim().toLowerCase();
 		if (!normalized) return this.values;
-		return this.values.filter((value) => value.toLowerCase().includes(normalized));
+
+		const filtered = this.values.filter((value) => value.toLowerCase().includes(normalized));
+		const queryTrimmed = query.trim();
+		const exists = this.values.some((v) => v.toLowerCase() === queryTrimmed.toLowerCase());
+		if (!exists && queryTrimmed) {
+			return [`CREATE_NEW_FILE:${queryTrimmed}`, ...filtered];
+		}
+		return filtered;
 	}
 
 	renderSuggestion(value: string, el: HTMLElement): void {
-		el.setText(value);
+		if (value.startsWith("CREATE_NEW_FILE:")) {
+			const path = value.slice("CREATE_NEW_FILE:".length);
+			el.addClass("taskslite-suggest-item");
+			el.createSpan({ text: "+ ", cls: "taskslite-suggest-new-icon" });
+			el.createSpan({ text: t("modal.createFile").replace("{path}", path) });
+		} else {
+			el.setText(value);
+		}
 	}
 
 	onChooseSuggestion(value: string): void {
-		this.onChoose(value);
+		if (value.startsWith("CREATE_NEW_FILE:")) {
+			const path = value.slice("CREATE_NEW_FILE:".length);
+			this.onChoose(path);
+		} else {
+			this.onChoose(value);
+		}
 	}
 }
 
@@ -409,9 +411,11 @@ function statusOptionLabel(status: StatusConfiguration): string {
 
 function targetFileOptions(app: App, basePath: string): string[] {
 	const prefix = normalizeFolderPath(basePath);
-	return app.vault
-		.getMarkdownFiles()
-		.map((file) => file.path)
+	const files = app.vault.getMarkdownFiles().map((file) => file.path);
+	if (!prefix) {
+		return files.map((path) => path.replace(/\.md$/iu, "")).sort((left, right) => left.localeCompare(right));
+	}
+	return files
 		.filter((path) => path.startsWith(`${prefix}/`))
 		.map((path) => path.slice(prefix.length + 1).replace(/\.md$/iu, ""))
 		.sort((left, right) => left.localeCompare(right));
@@ -422,6 +426,9 @@ function targetFilePath(basePath: string, value: string): string {
 	const trimmed = value.trim() || "New_Tasks";
 	const withoutLeadingSlash = trimmed.replace(/^\/+/u, "");
 	const withExtension = withoutLeadingSlash.toLowerCase().endsWith(".md") ? withoutLeadingSlash : `${withoutLeadingSlash}.md`;
+	if (!prefix) {
+		return withExtension;
+	}
 	return `${prefix}/${withExtension}`.replace(/\/+/gu, "/");
 }
 
@@ -448,5 +455,5 @@ function parentTaskSearchText(options: TaskLineModalParentTaskOptions["options"]
 }
 
 function normalizeFolderPath(value: string): string {
-	return value.trim().replace(/\\/gu, "/").replace(/^\/+|\/+$/gu, "") || "Tasks";
+	return value.trim().replace(/\\/gu, "/").replace(/^\/+|\/+$/gu, "");
 }

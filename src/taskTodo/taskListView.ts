@@ -3,7 +3,7 @@ import { t } from "../i18n";
 import { TASK_SYMBOLS, serializeTaskLine, todayString, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord } from "../taskLiteInterop";
 import { compareTaskTodoItems, type SortKey } from "./taskTodoSort";
 import type TaskTodoPlugin from "../main";
-import { openTaskLineModal as openLocalTaskLineModal } from "./taskLineModal";
+import { openTaskLineModal as openLocalTaskLineModal, openTaskLineModalWithTarget, type TaskLineModalResult } from "./taskLineModal";
 
 export const TASKTODO_VIEW = "tasktodo-task-list";
 
@@ -340,10 +340,13 @@ export class TaskTodoTaskListView extends ItemView {
 	}
 
 	private async createInboxTask(): Promise<void> {
-		const line = await openTaskLineModal(this.host, this.appRef, "", t("taskTodo.createTask"));
-		if (!line) return;
+		const result = await openTaskLineModalWithTargetHelper(this.host, this.appRef, "", t("taskTodo.createTask"), {
+			basePath: "",
+			defaultValue: "Tasks/New_Tasks",
+		});
+		if (!result || !result.line) return;
 		try {
-			await this.host.api.createTask(line, {path: "Tasks/New_Tasks.md"});
+			await this.host.api.createTask(result.line, {path: result.targetPath || "Tasks/New_Tasks.md"});
 		} catch (error) {
 			new Notice(t("notice.inboxPathFolder"));
 			console.warn("TaskTodo failed to create inbox task", error);
@@ -562,5 +565,22 @@ function openTaskLineModal(host: TaskTodoHost, app: App, initialLine: string, ti
 		initialLine,
 		registry: host.statusRegistry as any,
 		settings: host.settings as any,
+	});
+}
+
+function openTaskLineModalWithTargetHelper(
+	host: TaskTodoHost,
+	app: App,
+	initialLine: string,
+	title: string,
+	targetFile: { basePath: string; defaultValue: string }
+): Promise<TaskLineModalResult | null> {
+	return openTaskLineModalWithTarget({
+		app,
+		title,
+		initialLine,
+		registry: host.statusRegistry as any,
+		settings: host.settings as any,
+		targetFile,
 	});
 }
