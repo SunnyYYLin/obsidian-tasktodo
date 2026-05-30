@@ -1,7 +1,8 @@
 import { ItemView, Modal, Notice, Setting, setIcon, type App, type TFile, type WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
 import { TASK_SYMBOLS, serializeTaskLine, todayString, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord } from "../taskLiteInterop";
-import { compareTaskTodoItems } from "./taskTodoSort";
+import { compareTaskTodoItems, parseSortOrderSetting } from "./taskTodoSort";
+import type TaskTodoPlugin from "../main";
 
 export const TASKTODO_VIEW = "tasktodo-task-list";
 
@@ -36,6 +37,15 @@ interface TaskListTab {
 export class TaskTodoTaskListView extends ItemView {
 	private readonly collapsedGroups = new Set<string>(["overdue"]);
 	private readonly expandedTasks = new Set<string>();
+	private readonly hideCompletedGroups = new Set<string>([
+		"today-overdue",
+		"today",
+		"overdue",
+		"tomorrow",
+		"week",
+		"later",
+		"none",
+	]);
 	private activeTab: TaskListTabId = "in-plan";
 	private renderVersion = 0;
 	private renderTimer: number | null = null;
@@ -44,6 +54,7 @@ export class TaskTodoTaskListView extends ItemView {
 		leaf: WorkspaceLeaf,
 		private readonly appRef: App,
 		private readonly host: TaskTodoHost,
+		private readonly plugin: TaskTodoPlugin,
 	) {
 		super(leaf);
 	}
@@ -76,7 +87,7 @@ export class TaskTodoTaskListView extends ItemView {
 		}
 	}
 
-	private queueRender(): void {
+	queueRender(): void {
 		if (this.renderTimer !== null) window.clearTimeout(this.renderTimer);
 		this.renderTimer = window.setTimeout(() => {
 			this.renderTimer = null;
@@ -98,7 +109,7 @@ export class TaskTodoTaskListView extends ItemView {
 		const visibleTasks = filterTasksForTab(tasks, this.activeTab);
 		this.renderHeader(layout, visibleTasks.length);
 		this.renderTabs(layout, tabs, visibleTasks);
-		for (const group of groupTasks(visibleTasks, this.activeTab, this.collapsedGroups)) {
+		for (const group of groupTasks(visibleTasks, this.activeTab, this.collapsedGroups, this.hideCompletedGroups)) {
 			this.renderGroup(layout, group);
 		}
 	}
@@ -145,25 +156,48 @@ export class TaskTodoTaskListView extends ItemView {
 
 	private renderGroup(container: HTMLElement, group: TaskGroup): void {
 		const section = container.createEl("section", {cls: "taskslite-list-section"});
-		const header = section.createEl("button", {cls: "taskslite-section-header", attr: {"aria-expanded": String(!group.collapsed)}});
+		const header = section.createDiv({cls: "taskslite-section-header"});
 		const chevron = header.createSpan({cls: "taskslite-section-chevron"});
 		setIcon(chevron, group.collapsed ? "chevron-right" : "chevron-down");
 		header.createSpan({text: group.title, cls: "taskslite-section-title"});
 		header.createSpan({text: `${group.items.length}`, cls: "taskslite-section-count"});
-		header.addEventListener("click", () => {
+
+		header.addEventListener("click", (event) => {
+			if ((event.target as HTMLElement).closest(".taskslite-section-toggle-completed")) {
+				return;
+			}
 			if (this.collapsedGroups.has(group.id)) this.collapsedGroups.delete(group.id);
 			else this.collapsedGroups.add(group.id);
+			void this.render();
+		});
+
+		const isHideCompleted = this.hideCompletedGroups.has(group.id);
+		const toggleButton = header.createEl("button", {
+			cls: `taskslite-section-toggle-completed${isHideCompleted ? " is-active" : ""}`,
+			attr: {
+				"aria-label": isHideCompleted ? t("taskTodo.showCompleted") : t("taskTodo.hideCompleted"),
+			},
+		});
+		setIcon(toggleButton, isHideCompleted ? "eye-off" : "eye");
+		toggleButton.addEventListener("click", (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			if (isHideCompleted) {
+				this.hideCompletedGroups.delete(group.id);
+			} else {
+				this.hideCompletedGroups.add(group.id);
+			}
 			void this.render();
 		});
 
 		if (group.collapsed) return;
 		const list = section.createDiv({cls: "taskslite-task-list"});
 		for (const item of group.items) {
-			this.renderTaskItem(list, item);
+			this.renderTaskItem(list, item, isHideCompleted);
 		}
 	}
 
-	private renderTaskItem(container: HTMLElement, item: TaskListItem): void {
+	private renderTaskItem(container: HTMLElement, item: TaskListItem, isHideCompleted: boolean): void {
 		const wrapper = container.createDiv({cls: "taskslite-list-item-wrapper"});
 		const row = wrapper.createDiv({cls: "taskslite-list-item"});
 		row.dataset.taskStatusType = item.task.status.type;
@@ -192,7 +226,7 @@ export class TaskTodoTaskListView extends ItemView {
 		});
 
 		if (item.hasChildren && this.expandedTasks.has(taskKey(item))) {
-			this.renderChildList(wrapper, item);
+			this.renderChildList(wrapper, item, isHideCompleted);
 		}
 	}
 
@@ -260,13 +294,16 @@ export class TaskTodoTaskListView extends ItemView {
 		});
 	}
 
-	private renderChildList(container: HTMLElement, item: TaskListItem): void {
-		const children = item.children.filter((child) => isVisibleTask(child));
+	private renderChildList(container: HTMLElement, item: TaskListItem, isHideCompleted: boolean): void {
+		let children = item.children.filter((child) => isVisibleTask(child));
+		if (isHideCompleted) {
+			children = children.filter((child) => child.task.status.type !== "DONE");
+		}
 		if (children.length === 0) return;
 
 		const list = container.createDiv({cls: "taskslite-child-list"});
 		for (const child of children) {
-			this.renderTaskItem(list, child);
+			this.renderTaskItem(list, child, isHideCompleted);
 		}
 	}
 
@@ -297,7 +334,8 @@ export class TaskTodoTaskListView extends ItemView {
 			includeCancelled: true,
 		});
 		const items = taskRecordsToListItems(records).filter(isVisibleTask);
-		return items.sort(compareTaskTodoItems);
+		const sortKeys = parseSortOrderSetting(this.plugin.settings.sortOrderSetting);
+		return items.sort((a, b) => compareTaskTodoItems(a, b, sortKeys));
 	}
 
 	private async createInboxTask(): Promise<void> {
@@ -384,13 +422,33 @@ function otherMetadataParts(task: TaskTodoTaskLine): string[] {
 	return parts;
 }
 
-function groupTasks(tasks: TaskListItem[], activeTab: TaskListTabId, collapsedGroups: Set<string>): TaskGroup[] {
+function groupTasks(
+	tasks: TaskListItem[],
+	activeTab: TaskListTabId,
+	collapsedGroups: Set<string>,
+	hideCompletedGroups: Set<string>,
+): TaskGroup[] {
 	if (activeTab === "today") {
 		const overdueItems = tasks.filter(isOverdueTask);
 		const todayItems = tasks.filter((task) => !isOverdueTask(task));
+
+		const overdueFiltered = overdueItems.filter((item) => {
+			if (hideCompletedGroups.has("today-overdue") && item.task.status.type === "DONE") {
+				return false;
+			}
+			return true;
+		});
+
+		const todayFiltered = todayItems.filter((item) => {
+			if (hideCompletedGroups.has("today") && item.task.status.type === "DONE") {
+				return false;
+			}
+			return true;
+		});
+
 		return [
-			{id: "today-overdue", title: t("taskTodo.group.overdue"), items: overdueItems.filter(isActiveOverdueTask), collapsed: collapsedGroups.has("today-overdue")},
-			{id: "today", title: t("taskTodo.group.today"), items: todayItems, collapsed: collapsedGroups.has("today")},
+			{id: "today-overdue", title: t("taskTodo.group.overdue"), items: overdueFiltered, collapsed: collapsedGroups.has("today-overdue")},
+			{id: "today", title: t("taskTodo.group.today"), items: todayFiltered, collapsed: collapsedGroups.has("today")},
 		].filter((group) => group.items.length > 0);
 	}
 
@@ -408,12 +466,22 @@ function groupTasks(tasks: TaskListItem[], activeTab: TaskListTabId, collapsedGr
 
 	for (const task of tasks) {
 		const date = task.date;
-		if (!date) buckets[5]!.items.push(task);
-		else if (date < today) buckets[0]!.items.push(task);
-		else if (date === today) buckets[1]!.items.push(task);
-		else if (date === tomorrow) buckets[2]!.items.push(task);
-		else if (date <= nextWeek) buckets[3]!.items.push(task);
-		else buckets[4]!.items.push(task);
+		let groupId = "none";
+		if (!date) groupId = "none";
+		else if (date < today) groupId = "overdue";
+		else if (date === today) groupId = "today";
+		else if (date === tomorrow) groupId = "tomorrow";
+		else if (date <= nextWeek) groupId = "week";
+		else groupId = "later";
+
+		if (hideCompletedGroups.has(groupId) && task.task.status.type === "DONE") {
+			continue;
+		}
+
+		const bucket = buckets.find((b) => b.id === groupId);
+		if (bucket) {
+			bucket.items.push(task);
+		}
 	}
 
 	return buckets.filter((group) => group.items.length > 0);

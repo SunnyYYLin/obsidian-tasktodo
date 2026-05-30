@@ -44,6 +44,11 @@ const messages = {
 		"modal.blockLink": "Block link",
 		"notice.taskLiteMissing": "TaskLite Core must be enabled to use TaskTodo.",
 		"notice.inboxPathFolder": "The target path points to a folder.",
+		"taskTodo.showCompleted": "Show completed",
+		"taskTodo.hideCompleted": "Hide completed",
+		"settings.title": "TaskTodo Settings",
+		"settings.sortOrder.name": "Sort Order",
+		"settings.sortOrder.desc": "Order of fields to sort tasks by, separated by commas (supports: Date, Is cancelled, Importance, Life length). Default: Date, Is cancelled, Importance, Life length.",
 	},
 	zh: {
 		"common.cancel": "取消",
@@ -90,6 +95,11 @@ const messages = {
 		"modal.blockLink": "块链接",
 		"notice.taskLiteMissing": "使用 TaskTodo 需要先启用 TaskLite Core。",
 		"notice.inboxPathFolder": "目标路径指向了文件夹。",
+		"taskTodo.showCompleted": "显示已完成",
+		"taskTodo.hideCompleted": "隐藏已完成",
+		"settings.title": "TaskTodo 设置",
+		"settings.sortOrder.name": "排序方式",
+		"settings.sortOrder.desc": "任务排序字段的优先级顺序，用逗号分隔（支持：日期、是否取消、重要性、生命长度）。默认值：日期, 是否取消, 重要性, 生命长度",
 	},
 } as const;
 

@@ -158,6 +158,31 @@
 	color: var(--text-muted);
 }
 
+.taskslite-section-toggle-completed {
+	margin-left: auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.2rem;
+	height: 2.2rem;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	border-radius: 4px;
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.taskslite-section-toggle-completed:hover {
+	background: var(--background-secondary-alt);
+	color: var(--text-normal);
+}
+
+.taskslite-section-toggle-completed.is-active {
+	color: var(--interactive-accent);
+}
+
 .taskslite-list-item-wrapper {
 	display: flex;
 	flex-direction: column;
