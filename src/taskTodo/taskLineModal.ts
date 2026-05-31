@@ -97,17 +97,6 @@ class TaskLineModal extends Modal {
 			this.addParentTaskSetting(this.contentEl, this.options.parentTask);
 		}
 
-		if (!this.isCreateMode) {
-			new Setting(this.contentEl).setName(t("modal.status")).setClass("taskslite-modal-setting-compact").addDropdown((dropdown) => {
-				dropdown.selectEl.addClass("taskslite-modal-compact-control");
-				for (const status of modalStatuses(this.options.settings, this.options.registry)) {
-					dropdown.addOption(status.symbol, statusOptionLabel(status));
-				}
-				dropdown.setValue(this.fields.statusSymbol).onChange((value) => {
-					this.fields.statusSymbol = value;
-				});
-			});
-		}
 
 		this.addPrioritySetting(this.contentEl);
 		this.addDateSetting(`${TASK_SYMBOLS.start} ${t("modal.startDate")}`, "start");
@@ -391,22 +380,7 @@ class ParentTaskSuggestModal extends SuggestModal<string> {
 	}
 }
 
-function allStatuses(settings: any): StatusConfiguration[] {
-	const statusSettings = settings?.statusSettings as StatusSettings | undefined;
-	if (!statusSettings) return [];
-	return [...(statusSettings.coreStatuses || []), ...(statusSettings.customStatuses || [])];
-}
 
-function modalStatuses(settings: TaskLiteSettings, registry: StatusRegistry): StatusConfiguration[] {
-	const statuses = allStatuses(settings);
-	if (statuses.some((status) => status.symbol === " ")) return statuses;
-	return [registry.get(" ") as StatusConfiguration, ...statuses];
-}
-
-function statusOptionLabel(status: StatusConfiguration): string {
-	const symbol = status.symbol === " " ? "☐" : status.symbol || " ";
-	return `${symbol} ${status.name}`;
-}
 
 
 function targetFileOptions(app: App, basePath: string): string[] {
