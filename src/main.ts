@@ -85,7 +85,9 @@ export default class TaskTodoPlugin extends Plugin {
 			editorCheckCallback: (checking: boolean, editor: Editor, view) => {
 				if (!(view instanceof MarkdownView)) return false;
 				if (checking) return true;
-				void this.editTaskInEditor(editor);
+				const file = view.file;
+				if (!file) return false;
+				void this.editTaskInEditor(editor, file);
 				return true;
 			},
 		});
@@ -200,34 +202,77 @@ export default class TaskTodoPlugin extends Plugin {
 			return;
 		}
 
-		// 写入当前正在编辑的文件时，通过编辑器 API 在光标位置插入，保留光标上下文
-		const cursor = editor.getCursor();
-		const currentLine = editor.getLine(cursor.line);
-		if (currentLine.trim() === "") {
-			editor.replaceRange(result.line, {line: cursor.line, ch: 0}, {line: cursor.line, ch: currentLine.length});
-			editor.setCursor({line: cursor.line, ch: result.line.length});
-			return;
+		// 目标是当前文件：通过 TaskLite API 创建，追加到文件末尾
+		const fields = fieldsFromTaskLine(result.line, this.host.statusRegistry as unknown as StatusRegistry);
+		const input: CreateTaskInput = {
+			description: fields.description,
+			status: fields.statusSymbol,
+			priority: fields.priority || null,
+			dates: {
+				start: fields.start || null,
+				scheduled: fields.scheduled || null,
+				due: fields.due || null,
+			},
+			recurrence: fields.recurrence || null,
+			onCompletion: fields.onCompletion || null,
+			id: fields.id || null,
+			dependsOn: fields.dependsOn || null,
+			path: currentFile.path,
+		};
+		try {
+			await this.host.api.createTask(input);
+		} catch (error) {
+			new Notice(t("notice.inboxPathFolder"));
+			console.warn("TaskTodo failed to create task in current file", error);
 		}
-
-		editor.replaceRange(`\n${result.line}`, {line: cursor.line, ch: currentLine.length});
-		editor.setCursor({line: cursor.line + 1, ch: result.line.length});
 	}
 
-	private async editTaskInEditor(editor: Editor): Promise<void> {
+	private async editTaskInEditor(editor: Editor, file: TFile): Promise<void> {
 		if (!this.host) return;
 		const cursor = editor.getCursor();
 		const currentLine = editor.getLine(cursor.line);
-		const line = await openTaskLineModal({
+		const newLine = await openTaskLineModal({
 			app: this.app,
 			title: t("command.editTask"),
 			initialLine: currentLine,
 			registry: this.host.statusRegistry as any,
 			settings: this.host.settings as any,
 		});
-		if (!line) return;
+		if (!newLine || newLine === currentLine) return;
 
-		editor.replaceRange(line, {line: cursor.line, ch: 0}, {line: cursor.line, ch: currentLine.length});
-		editor.setCursor({line: cursor.line, ch: Math.min(cursor.ch, line.length)});
+		const registry = this.host.statusRegistry as unknown as StatusRegistry;
+		const oldFields = fieldsFromTaskLine(currentLine, registry);
+		const newFields = fieldsFromTaskLine(newLine, registry);
+
+		// 通过 TaskLite API 更新元数据字段
+		await this.host.api.editTask(file.path, cursor.line, {
+			description: newFields.description,
+			priority: newFields.priority || null,
+			dates: {
+				start: newFields.start || null,
+				scheduled: newFields.scheduled || null,
+				due: newFields.due || null,
+			},
+			recurrence: newFields.recurrence || null,
+			onCompletion: newFields.onCompletion || null,
+			id: newFields.id || null,
+			dependsOn: newFields.dependsOn || null,
+		});
+
+		// 状态变更通过专用 API 处理（editTask 不涉及状态）
+		if (newFields.statusSymbol !== oldFields.statusSymbol) {
+			const newStatusType = this.host.statusRegistry.get(newFields.statusSymbol).type;
+			const oldStatusType = this.host.statusRegistry.get(oldFields.statusSymbol).type;
+			if (newStatusType === "DONE") {
+				await this.host.api.finishTask(file.path, cursor.line);
+			} else if (newStatusType === "CANCELLED") {
+				await this.host.api.cancelTask(file.path, cursor.line);
+			} else if (oldStatusType === "DONE") {
+				await this.host.api.unfinishTask(file.path, cursor.line);
+			} else if (oldStatusType === "CANCELLED") {
+				await this.host.api.uncancelTask(file.path, cursor.line);
+			}
+		}
 	}
 
 	private async createOrEditTaskInEditor(editor: Editor, file: TFile): Promise<void> {
@@ -237,7 +282,7 @@ export default class TaskTodoPlugin extends Plugin {
 			await this.createTaskInEditor(editor, file);
 			return;
 		}
-		await this.editTaskInEditor(editor);
+		await this.editTaskInEditor(editor, file);
 	}
 
 	onunload(): void {

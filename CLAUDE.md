@@ -43,13 +43,12 @@ bun test <name>      # 运行单个测试文件
 
 ### 禁止直接读写笔记文件内容
 
-**本插件不得直接读写 vault 文件内容（`app.vault.read/cachedRead/modify/create/delete` 等），所有任务数据的增删改均必须通过 TaskLite Core API（`host.api.*`）进行。**
+**本插件不得直接读写 vault 文件内容（`app.vault.read/cachedRead/modify/create/delete`、`editor.replaceRange` 等），所有任务数据的增删改均必须通过 TaskLite Core API（`host.api.*`）进行，无任何例外。**
 
 理由：
 - 任务文件的读写逻辑由 TaskLite Core 统一维护（缓存、文档存储、并发安全）
 - 绕过 API 直接写文件可能造成与 TaskLite 内部状态不一致
 
-以下属于正常的 Obsidian 官方 API 用法，不在此约束范围内：
+以下属于正常的 Obsidian 官方 API 用法，不在此约束范围内（均为只读或无副作用操作）：
 - **`vault.on(event)`** — 事件监听，不读写文件内容，仅用于触发视图刷新
 - **`vault.getMarkdownFiles()` / `vault.getFiles()`** — 只读的文件索引枚举，不涉及文件内容
-- **`editor.replaceRange/setCursor`** — 编辑器会话操作；在 `main.ts` 的编辑器命令中，当创建目标即为用户当前正在编辑的文件时使用，不绕过 TaskLite
