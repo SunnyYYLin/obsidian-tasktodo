@@ -1,9 +1,10 @@
-import { ItemView, Modal, Notice, Setting, setIcon, type App, type TFile, type WorkspaceLeaf } from "obsidian";
+import { ItemView, Notice, setIcon, type App, type WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
-import { TASK_SYMBOLS, serializeTaskLine, todayString, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord } from "../taskLiteInterop";
-import { compareTaskTodoItems, type SortKey } from "./taskTodoSort";
+import { TASK_SYMBOLS, serializeTaskLine, todayString, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord, type EditTaskPatch } from "../taskLiteInterop";
+import { compareTaskTodoItems } from "./taskTodoSort";
 import type TaskTodoPlugin from "../main";
-import { openTaskLineModal as openLocalTaskLineModal, openTaskLineModalWithTarget, type TaskLineModalResult } from "./taskLineModal";
+import { openTaskLineModal as openLocalTaskLineModal, openTaskLineModalWithTarget, type TaskLineModalResult, type TaskLiteSettings } from "./taskLineModal";
+import { fieldsFromTaskLine, type StatusRegistry } from "./taskLineFields";
 
 export const TASKTODO_VIEW = "tasktodo-task-list";
 
@@ -311,13 +312,43 @@ export class TaskTodoTaskListView extends ItemView {
 	private async editTask(item: TaskListItem): Promise<void> {
 		const updatedLine = await openTaskLineModal(this.host, this.appRef, serializeTaskLine(item.task), t("taskTodo.createTask"));
 		if (!updatedLine || updatedLine === serializeTaskLine(item.task)) return;
-		const file = this.appRef.vault.getAbstractFileByPath(item.path);
-		if (!isMarkdownFile(file)) return;
-		const content = await this.appRef.vault.read(file);
-		const lines = content.split("\n");
-		if (item.lineNumber < 0 || item.lineNumber >= lines.length) return;
-		lines[item.lineNumber] = updatedLine;
-		await this.appRef.vault.modify(file, lines.join("\n"));
+
+		const fields = fieldsFromTaskLine(updatedLine, this.host.statusRegistry as unknown as StatusRegistry);
+		const patch: EditTaskPatch = {
+			description: fields.description,
+			priority: fields.priority || null,
+			dates: {
+				start: fields.start || null,
+				created: fields.created || null,
+				scheduled: fields.scheduled || null,
+				due: fields.due || null,
+				done: fields.done || null,
+				cancelled: fields.cancelled || null,
+			},
+			recurrence: fields.recurrence || null,
+			onCompletion: fields.onCompletion || null,
+			id: fields.id || null,
+			dependsOn: fields.dependsOn || null,
+		};
+
+		await this.host.api.editTask(item.path, item.lineNumber, patch);
+
+		const newStatus = this.host.statusRegistry.get(fields.statusSymbol);
+		const oldStatusType = item.task.status.type;
+		const newStatusType = newStatus.type;
+
+		if (newStatusType !== oldStatusType) {
+			if (newStatusType === "DONE") {
+				await this.host.api.finishTask(item.path, item.lineNumber);
+			} else if (newStatusType === "CANCELLED") {
+				await this.host.api.cancelTask(item.path, item.lineNumber);
+			} else if (oldStatusType === "DONE") {
+				await this.host.api.unfinishTask(item.path, item.lineNumber);
+			} else if (oldStatusType === "CANCELLED") {
+				await this.host.api.uncancelTask(item.path, item.lineNumber);
+			}
+		}
+
 		await this.render();
 	}
 
@@ -521,10 +552,6 @@ function isOverdueTask(item: TaskListItem): boolean {
 	return Boolean((scheduled && scheduled < today) || (due && due < today));
 }
 
-function isActiveOverdueTask(item: TaskListItem): boolean {
-	if (item.task.status.type === "DONE" || item.task.status.type === "CANCELLED") return false;
-	return isOverdueTask(item);
-}
 
 function taskKey(item: Pick<TaskListItem, "path" | "lineNumber">): string {
 	return `${item.path}:${item.lineNumber}`;
@@ -538,9 +565,6 @@ function shiftDate(value: string, amount: number): string {
 	return `${date.getUTCFullYear().toString().padStart(4, "0")}-${(date.getUTCMonth() + 1).toString().padStart(2, "0")}-${date.getUTCDate().toString().padStart(2, "0")}`;
 }
 
-function isMarkdownFile(file: unknown): file is TFile {
-	return Boolean(file && typeof file === "object" && "path" in file && "extension" in file && "basename" in file);
-}
 
 function applyTaskStatusIcon(container: HTMLElement, statusType: string): void {
 	container.empty();
@@ -563,8 +587,8 @@ function openTaskLineModal(host: TaskTodoHost, app: App, initialLine: string, ti
 		app,
 		title,
 		initialLine,
-		registry: host.statusRegistry as any,
-		settings: host.settings as any,
+		registry: host.statusRegistry as unknown as StatusRegistry,
+		settings: host.settings as unknown as TaskLiteSettings,
 	});
 }
 
@@ -579,8 +603,8 @@ function openTaskLineModalWithTargetHelper(
 		app,
 		title,
 		initialLine,
-		registry: host.statusRegistry as any,
-		settings: host.settings as any,
+		registry: host.statusRegistry as unknown as StatusRegistry,
+		settings: host.settings as unknown as TaskLiteSettings,
 		targetFile,
 	});
 }

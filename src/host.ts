@@ -12,9 +12,11 @@ export interface TaskTodoTaskLine {
 		priority: string | null;
 		dates: {
 			start: string | null;
+			created: string | null;
 			scheduled: string | null;
 			due: string | null;
 			done: string | null;
+			cancelled: string | null;
 		};
 		recurrence: string | null;
 		onCompletion: string | null;
@@ -34,6 +36,23 @@ export interface TaskTodoTaskRecord {
 	task: TaskTodoTaskLine;
 }
 
+export interface EditTaskPatch {
+	description?: string;
+	priority?: string | null;
+	dates?: {
+		start?: string | null;
+		created?: string | null;
+		scheduled?: string | null;
+		due?: string | null;
+		done?: string | null;
+		cancelled?: string | null;
+	};
+	recurrence?: string | null;
+	onCompletion?: string | null;
+	id?: string | null;
+	dependsOn?: string | null;
+}
+
 export interface TaskTodoCoreApi {
 	listTasks(options?: {
 		includeCompleted?: boolean;
@@ -45,6 +64,8 @@ export interface TaskTodoCoreApi {
 	cancelTask(path: string, lineNumber: number): Promise<boolean>;
 	uncancelTask(path: string, lineNumber: number): Promise<boolean>;
 	createTask(line: string, options?: {path?: string; parentLineNumber?: number}): Promise<void>;
+	deleteTask(path: string, lineNumber: number): Promise<boolean>;
+	editTask(path: string, lineNumber: number, patch: EditTaskPatch): Promise<boolean>;
 	executeTasksToggleCommand(line: string, path: string): string;
 }
 

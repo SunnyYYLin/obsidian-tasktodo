@@ -1,6 +1,6 @@
 import type { TaskTodoTaskLine } from "./host";
 
-export { getTaskLiteHost, TASKLITE_PLUGIN_ID, type TaskTodoCoreApi, type TaskTodoHost, type TaskTodoTaskRecord, type TaskTodoTaskLine } from "./host";
+export { getTaskLiteHost, TASKLITE_PLUGIN_ID, type TaskTodoCoreApi, type TaskTodoHost, type TaskTodoTaskRecord, type TaskTodoTaskLine, type EditTaskPatch } from "./host";
 
 export const TASK_SYMBOLS = {
 	priority: {
@@ -26,9 +26,11 @@ export function serializeTaskLine(task: TaskTodoTaskLine): string {
 	const parts = [task.metadata.description.trim()];
 	if (task.metadata.priority) parts.push(task.metadata.priority);
 	addDate(parts, TASK_SYMBOLS.start, task.metadata.dates.start);
+	addDate(parts, TASK_SYMBOLS.created, task.metadata.dates.created);
 	addDate(parts, TASK_SYMBOLS.scheduled, task.metadata.dates.scheduled);
 	addDate(parts, TASK_SYMBOLS.due, task.metadata.dates.due);
 	addDate(parts, TASK_SYMBOLS.done, task.metadata.dates.done);
+	addDate(parts, TASK_SYMBOLS.cancelled, task.metadata.dates.cancelled);
 	if (task.metadata.recurrence) parts.push(`${TASK_SYMBOLS.recurrence} ${task.metadata.recurrence}`);
 	if (task.metadata.onCompletion) parts.push(`${TASK_SYMBOLS.onCompletion} ${task.metadata.onCompletion}`);
 	if (task.metadata.dependsOn) parts.push(`${TASK_SYMBOLS.dependsOn} ${task.metadata.dependsOn}`);

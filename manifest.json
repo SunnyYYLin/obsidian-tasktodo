@@ -1,9 +1,12 @@
 {
   "id": "tasktodo",
   "name": "TaskTodo",
-  "version": "0.1.1",
+  "version": "0.2.0-alpha.0",
   "minAppVersion": "1.8.0",
   "description": "A planning and today dashboard for TaskLite Core.",
   "author": "sunnylin",
-  "isDesktopOnly": false
+  "isDesktopOnly": false,
+  "dependencies": {
+    "taskslite": "0.4.0-alpha.0"
+  }
 }

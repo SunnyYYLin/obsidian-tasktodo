@@ -8,7 +8,7 @@ function makeTask(overrides: Partial<TaskTodoTaskLine> = {}): TaskTodoTaskLine {
 		metadata: {
 			description: "test task",
 			priority: null,
-			dates: { start: null, scheduled: null, due: null, done: null },
+			dates: { start: null, created: null, scheduled: null, due: null, done: null, cancelled: null },
 			recurrence: null,
 			onCompletion: null,
 			id: null,
@@ -65,6 +65,16 @@ describe("serializeTaskLine", () => {
 		expect(serializeTaskLine(task)).toContain(`${TASK_SYMBOLS.done} 2024-06-20`);
 	});
 
+	test("带 created 日期", () => {
+		const task = makeTask({ metadata: { ...makeTask().metadata, dates: { ...makeTask().metadata.dates, created: "2024-05-31" } } });
+		expect(serializeTaskLine(task)).toContain(`${TASK_SYMBOLS.created} 2024-05-31`);
+	});
+
+	test("带 cancelled 日期", () => {
+		const task = makeTask({ metadata: { ...makeTask().metadata, dates: { ...makeTask().metadata.dates, cancelled: "2024-06-21" } } });
+		expect(serializeTaskLine(task)).toContain(`${TASK_SYMBOLS.cancelled} 2024-06-21`);
+	});
+
 	test("带循环", () => {
 		const task = makeTask({ metadata: { ...makeTask().metadata, recurrence: "every week" } });
 		expect(serializeTaskLine(task)).toContain(`${TASK_SYMBOLS.recurrence} every week`);
@@ -96,7 +106,7 @@ describe("serializeTaskLine", () => {
 			metadata: {
 				description: "full task",
 				priority: TASK_SYMBOLS.priority.high,
-				dates: { start: "2024-01-01", scheduled: "2024-06-01", due: "2024-06-15", done: "2024-06-14" },
+				dates: { start: "2024-01-01", created: "2024-05-31", scheduled: "2024-06-01", due: "2024-06-15", done: "2024-06-14", cancelled: "2024-06-21" },
 				recurrence: "every month",
 				onCompletion: "archive",
 				id: "tid1",
@@ -108,9 +118,11 @@ describe("serializeTaskLine", () => {
 		expect(line).toStartWith("- [x] full task");
 		expect(line).toContain(TASK_SYMBOLS.priority.high);
 		expect(line).toContain(`${TASK_SYMBOLS.start} 2024-01-01`);
+		expect(line).toContain(`${TASK_SYMBOLS.created} 2024-05-31`);
 		expect(line).toContain(`${TASK_SYMBOLS.scheduled} 2024-06-01`);
 		expect(line).toContain(`${TASK_SYMBOLS.due} 2024-06-15`);
 		expect(line).toContain(`${TASK_SYMBOLS.done} 2024-06-14`);
+		expect(line).toContain(`${TASK_SYMBOLS.cancelled} 2024-06-21`);
 		expect(line).toContain(`${TASK_SYMBOLS.recurrence} every month`);
 		expect(line).toContain(`${TASK_SYMBOLS.onCompletion} archive`);
 		expect(line).toContain(`${TASK_SYMBOLS.dependsOn} tid0`);
@@ -124,7 +136,9 @@ describe("serializeTaskLine", () => {
 		expect(line).not.toContain(TASK_SYMBOLS.due);
 		expect(line).not.toContain(TASK_SYMBOLS.scheduled);
 		expect(line).not.toContain(TASK_SYMBOLS.start);
+		expect(line).not.toContain(TASK_SYMBOLS.created);
 		expect(line).not.toContain(TASK_SYMBOLS.done);
+		expect(line).not.toContain(TASK_SYMBOLS.cancelled);
 	});
 });
 
