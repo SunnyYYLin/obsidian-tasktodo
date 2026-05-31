@@ -1,9 +1,10 @@
 import { Notice, Plugin, PluginSettingTab, Setting, Editor, MarkdownView, TFile } from "obsidian";
 import { t, type I18nKey } from "./i18n";
-import { getTaskLiteHost, type TaskTodoHost } from "./host";
+import { getTaskLiteHost, type TaskTodoHost, type CreateTaskInput } from "./host";
 import { TASKTODO_VIEW, TaskTodoTaskListView } from "./taskTodo/taskListView";
 import { openTaskLineModal, openTaskLineModalWithTarget, type TaskLineModalResult } from "./taskTodo/taskLineModal";
 import { type SortKey } from "./taskTodo/taskTodoSort";
+import { fieldsFromTaskLine, type StatusRegistry } from "./taskTodo/taskLineFields";
 
 export interface TaskTodoSettings {
 	sortOrder: SortKey[];
@@ -173,15 +174,33 @@ export default class TaskTodoPlugin extends Plugin {
 
 		const targetPath = result.targetPath ?? currentFile.path;
 		if (targetPath !== currentFile.path) {
-			const targetFile = this.app.vault.getAbstractFileByPath(targetPath);
-			if (targetFile instanceof TFile) {
-				const content = await this.app.vault.read(targetFile);
-				const separator = content.length > 0 && !content.endsWith("\n") ? "\n" : "";
-				await this.app.vault.modify(targetFile, `${content}${separator}${result.line}\n`);
+			// 写入其他文件时，通过 TaskLite API 创建任务，避免直接操作 vault
+			const fields = fieldsFromTaskLine(result.line, this.host.statusRegistry as unknown as StatusRegistry);
+			const input: CreateTaskInput = {
+				description: fields.description,
+				status: fields.statusSymbol,
+				priority: fields.priority || null,
+				dates: {
+					start: fields.start || null,
+					scheduled: fields.scheduled || null,
+					due: fields.due || null,
+				},
+				recurrence: fields.recurrence || null,
+				onCompletion: fields.onCompletion || null,
+				id: fields.id || null,
+				dependsOn: fields.dependsOn || null,
+				path: targetPath,
+			};
+			try {
+				await this.host.api.createTask(input);
+			} catch (error) {
+				new Notice(t("notice.inboxPathFolder"));
+				console.warn("TaskTodo failed to create task in target file", error);
 			}
 			return;
 		}
 
+		// 写入当前正在编辑的文件时，通过编辑器 API 在光标位置插入，保留光标上下文
 		const cursor = editor.getCursor();
 		const currentLine = editor.getLine(cursor.line);
 		if (currentLine.trim() === "") {

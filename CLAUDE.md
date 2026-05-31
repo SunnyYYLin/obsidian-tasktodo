@@ -40,3 +40,16 @@ bun test <name>      # 运行单个测试文件
 
 - 代码注释和文档使用中文
 - TypeScript 严格模式（strictNullChecks、noImplicitAny 等），`baseUrl` 设为 `src`
+
+### 禁止直接操作笔记文件
+
+**本插件不得直接读写 vault 文件（`app.vault.read/modify/create/delete` 等），所有任务数据的增删改均必须通过 TaskLite Core API（`host.api.*`）进行。**
+
+理由：
+- 任务文件的读写逻辑由 TaskLite Core 统一维护（缓存、文档存储、并发安全）
+- 绕过 API 直接写文件可能造成与 TaskLite 内部状态不一致
+
+允许的例外（仅限以下场景）：
+1. **`vault.on(event)`（事件监听）** — 在 `taskListView.ts` 中订阅 modify/create/delete/rename 事件以触发重新渲染；不读写文件内容，仅作为刷新触发信号，可保留。
+2. **`vault.getMarkdownFiles()`（枚举文件列表）** — 在 `taskLineModal.ts` 中获取候选目标文件列表，供用户在 UI 中选择创建目标路径；TaskLite API 不提供此能力，可保留。
+3. **`editor.replaceRange/setCursor`（编辑器 API 写入当前文件）** — 在 `main.ts` 的「在编辑器中创建/编辑任务」命令中，当目标文件即为用户正在编辑的当前文件时，通过编辑器 API 在光标处插入/替换行，以保留光标上下文体验；此为 Obsidian 编辑器操作而非 vault 文件操作，可保留。
