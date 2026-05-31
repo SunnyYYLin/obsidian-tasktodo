@@ -38,7 +38,6 @@ export interface TaskTodoTaskRecord {
 
 export interface CreateTaskInput {
 	description: string;
-	status?: string;
 	priority?: string | null;
 	dates?: {
 		start?: string | null;

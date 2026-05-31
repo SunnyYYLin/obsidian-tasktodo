@@ -180,7 +180,6 @@ export default class TaskTodoPlugin extends Plugin {
 			const fields = fieldsFromTaskLine(result.line, this.host.statusRegistry as unknown as StatusRegistry);
 			const input: CreateTaskInput = {
 				description: fields.description,
-				status: fields.statusSymbol,
 				priority: fields.priority || null,
 				dates: {
 					start: fields.start || null,
@@ -206,7 +205,6 @@ export default class TaskTodoPlugin extends Plugin {
 		const fields = fieldsFromTaskLine(result.line, this.host.statusRegistry as unknown as StatusRegistry);
 		const input: CreateTaskInput = {
 			description: fields.description,
-			status: fields.statusSymbol,
 			priority: fields.priority || null,
 			dates: {
 				start: fields.start || null,
