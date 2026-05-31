@@ -102,16 +102,10 @@ class TaskLineModal extends Modal {
 		this.addDateSetting(`${TASK_SYMBOLS.start} ${t("modal.startDate")}`, "start");
 		this.addDateSetting(`${TASK_SYMBOLS.scheduled} ${t("modal.scheduledDate")}`, "scheduled");
 		this.addDateSetting(`${TASK_SYMBOLS.due} ${t("modal.dueDate")}`, "due");
-		if (!this.isCreateMode) {
-			this.addDateSetting(`${TASK_SYMBOLS.created} ${t("modal.createdDate")}`, "created");
-			this.addDateSetting(`${TASK_SYMBOLS.done} ${t("modal.doneDate")}`, "done");
-			this.addDateSetting(`${TASK_SYMBOLS.cancelled} ${t("modal.cancelledDate")}`, "cancelled");
-		}
 		this.addRecurrenceSetting(this.contentEl);
 		this.addOnCompletionSetting(this.contentEl);
 		this.addTextSetting(this.contentEl, `${TASK_SYMBOLS.id} ${t("modal.taskId")}`, "id", "id");
 		this.addTextSetting(this.contentEl, `${TASK_SYMBOLS.dependsOn} ${t("modal.dependsOn")}`, "id1, id2", "dependsOn");
-		this.addTextSetting(this.contentEl, t("modal.blockLink"), "^block-id", "blockLink");
 
 		new Setting(this.contentEl)
 			.addButton((button) =>
@@ -169,7 +163,7 @@ class TaskLineModal extends Modal {
 		});
 	}
 
-	private addDateSetting(name: string, key: "start" | "created" | "scheduled" | "due" | "done" | "cancelled"): void {
+	private addDateSetting(name: string, key: "start" | "scheduled" | "due"): void {
 		new Setting(this.contentEl).setName(name).setClass("taskslite-modal-setting-compact").addText((text) => {
 			text.inputEl.type = "date";
 			text.inputEl.addClass("taskslite-modal-date-input", "taskslite-modal-compact-control");
