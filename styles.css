@@ -603,4 +603,49 @@
 	font-weight: bold;
 }
 
+/* Refresh button styling */
+.taskslite-refresh-tasks {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.35rem;
+	min-width: 2rem;
+	height: 2rem;
+	margin: 0;
+	padding: 0 0.65rem;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	cursor: pointer;
+	white-space: nowrap;
+}
+
+.taskslite-refresh-tasks:hover {
+	background: var(--background-secondary-alt);
+}
+
+/* Confirm Modal Styling */
+.taskslite-confirm-modal {
+	padding: 1.5rem;
+}
+
+.taskslite-modal-buttons {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.75rem;
+	margin-top: 1.5rem;
+}
+
+@media (max-width: 700px) {
+	.taskslite-refresh-tasks {
+		padding: 0 0.55rem;
+	}
+
+	.taskslite-refresh-tasks span:last-child {
+		display: none;
+	}
+}
+
+
 

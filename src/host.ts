@@ -56,6 +56,7 @@ export interface CreateTaskInput {
 export interface EditTaskPatch {
 	description?: string;
 	priority?: string | null;
+	statusSymbol?: string;
 	dates?: {
 		start?: string | null;
 		scheduled?: string | null;

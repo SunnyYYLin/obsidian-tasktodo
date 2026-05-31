@@ -1,8 +1,9 @@
-import { ItemView, Notice, setIcon, type App, type WorkspaceLeaf } from "obsidian";
+import { ItemView, Menu, Modal, Notice, setIcon, type App, type WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
 import { TASK_SYMBOLS, serializeTaskLine, todayString, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord, type EditTaskPatch, type CreateTaskInput } from "../taskLiteInterop";
 import { compareTaskTodoItems } from "./taskTodoSort";
 import type TaskTodoPlugin from "../main";
+import type { FilterConfig, TabConfig, ColumnConfig } from "../main";
 import { openTaskLineModal as openLocalTaskLineModal, openTaskLineModalWithTarget, type TaskLineModalResult, type TaskLiteSettings } from "./taskLineModal";
 import { fieldsFromTaskLine, type StatusRegistry } from "./taskLineFields";
 
@@ -29,26 +30,15 @@ interface TaskGroup {
 	collapsed: boolean;
 }
 
-type TaskListTabId = "in-plan" | "today";
-
 interface TaskListTab {
-	id: TaskListTabId;
+	id: string;
 	title: string;
 }
 
 export class TaskTodoTaskListView extends ItemView {
 	private readonly collapsedGroups = new Set<string>(["overdue"]);
 	private readonly expandedTasks = new Set<string>();
-	private readonly hideCompletedGroups = new Set<string>([
-		"today-overdue",
-		"today",
-		"overdue",
-		"tomorrow",
-		"week",
-		"later",
-		"none",
-	]);
-	private activeTab: TaskListTabId = "in-plan";
+	private activeTab = "";
 	private renderVersion = 0;
 	private renderTimer: number | null = null;
 
@@ -107,12 +97,22 @@ export class TaskTodoTaskListView extends ItemView {
 		content.addClass("taskslite-list-root");
 		const layout = content.createDiv({cls: "taskslite-list-layout"});
 
-		const tabs = taskListTabs();
-		const visibleTasks = filterTasksForTab(tasks, this.activeTab);
+		if (this.activeTab === "" || !this.plugin.settings.tabs.some(t => t.id === this.activeTab)) {
+			this.activeTab = this.plugin.settings.tabs[0]?.id || "";
+		}
+
+		const tabs = this.plugin.settings.tabs.map(t => ({ id: t.id, title: t.title }));
+		const activeTabConfig = this.plugin.settings.tabs.find(t => t.id === this.activeTab) || this.plugin.settings.tabs[0];
+		
+		const visibleTasks = activeTabConfig ? tasks.filter(task => matchFilter(task, activeTabConfig.filter)) : [];
 		this.renderHeader(layout, visibleTasks.length);
 		this.renderTabs(layout, tabs, visibleTasks);
-		for (const group of groupTasks(visibleTasks, this.activeTab, this.collapsedGroups, this.hideCompletedGroups)) {
-			this.renderGroup(layout, group);
+
+		if (activeTabConfig) {
+			const columns = this.plugin.settings.columns;
+			for (const group of groupTasksCustom(visibleTasks, columns, this.collapsedGroups)) {
+				this.renderGroup(layout, group, activeTabConfig.filter);
+			}
 		}
 	}
 
@@ -126,6 +126,15 @@ export class TaskTodoTaskListView extends ItemView {
 		titleGroup.createSpan({text: `${count}`, cls: "taskslite-list-count"});
 
 		const actions = header.createDiv({cls: "taskslite-list-header-actions"});
+
+		const refreshButton = actions.createEl("button", {cls: "taskslite-refresh-tasks", attr: {"aria-label": t("taskTodo.refresh")}});
+		const refreshIcon = refreshButton.createSpan();
+		setIcon(refreshIcon, "refresh-cw");
+		refreshButton.createSpan({text: t("taskTodo.refresh")});
+		refreshButton.addEventListener("click", () => {
+			void this.render();
+		});
+
 		const addButton = actions.createEl("button", {cls: "taskslite-add-task", attr: {"aria-label": t("taskTodo.addTask")}});
 		const addIcon = addButton.createSpan();
 		setIcon(addIcon, "plus");
@@ -153,10 +162,16 @@ export class TaskTodoTaskListView extends ItemView {
 
 		if (tasks.length > 0) return;
 		const emptyState = container.createDiv({cls: "taskslite-list-empty"});
-		emptyState.setText(this.activeTab === "in-plan" ? t("taskTodo.empty.inPlan") : t("taskTodo.empty.today"));
+		emptyState.setText(
+			this.activeTab === "in-plan"
+				? t("taskTodo.empty.inPlan")
+				: this.activeTab === "today"
+				? t("taskTodo.empty.today")
+				: (t("common.none") || "No tasks.")
+		);
 	}
 
-	private renderGroup(container: HTMLElement, group: TaskGroup): void {
+	private renderGroup(container: HTMLElement, group: TaskGroup, filter: FilterConfig): void {
 		const section = container.createEl("section", {cls: "taskslite-list-section"});
 		const header = section.createDiv({cls: "taskslite-section-header"});
 		const chevron = header.createSpan({cls: "taskslite-section-chevron"});
@@ -164,42 +179,20 @@ export class TaskTodoTaskListView extends ItemView {
 		header.createSpan({text: group.title, cls: "taskslite-section-title"});
 		header.createSpan({text: `${group.items.length}`, cls: "taskslite-section-count"});
 
-		header.addEventListener("click", (event) => {
-			if ((event.target as HTMLElement).closest(".taskslite-section-toggle-completed")) {
-				return;
-			}
+		header.addEventListener("click", () => {
 			if (this.collapsedGroups.has(group.id)) this.collapsedGroups.delete(group.id);
 			else this.collapsedGroups.add(group.id);
-			void this.render();
-		});
-
-		const isHideCompleted = this.hideCompletedGroups.has(group.id);
-		const toggleButton = header.createEl("button", {
-			cls: `taskslite-section-toggle-completed${isHideCompleted ? " is-active" : ""}`,
-			attr: {
-				"aria-label": isHideCompleted ? t("taskTodo.showCompleted") : t("taskTodo.hideCompleted"),
-			},
-		});
-		setIcon(toggleButton, isHideCompleted ? "eye-off" : "eye");
-		toggleButton.addEventListener("click", (event) => {
-			event.preventDefault();
-			event.stopPropagation();
-			if (isHideCompleted) {
-				this.hideCompletedGroups.delete(group.id);
-			} else {
-				this.hideCompletedGroups.add(group.id);
-			}
 			void this.render();
 		});
 
 		if (group.collapsed) return;
 		const list = section.createDiv({cls: "taskslite-task-list"});
 		for (const item of group.items) {
-			this.renderTaskItem(list, item, isHideCompleted);
+			this.renderTaskItem(list, item, filter);
 		}
 	}
 
-	private renderTaskItem(container: HTMLElement, item: TaskListItem, isHideCompleted: boolean): void {
+	private renderTaskItem(container: HTMLElement, item: TaskListItem, filter: FilterConfig): void {
 		const wrapper = container.createDiv({cls: "taskslite-list-item-wrapper"});
 		const row = wrapper.createDiv({cls: "taskslite-list-item"});
 		row.dataset.taskStatusType = item.task.status.type;
@@ -221,14 +214,96 @@ export class TaskTodoTaskListView extends ItemView {
 		const body = row.createDiv({cls: "taskslite-list-item-body"});
 		this.renderItemTitle(body, item);
 		this.renderItemMeta(body, item);
-		this.renderItemActions(row, item);
 
 		row.addEventListener("click", () => {
 			void this.editTask(item);
 		});
 
+		row.addEventListener("contextmenu", (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			
+			const menu = new Menu();
+
+			// 1. 添加子任务 (Add subtask)
+			menu.addItem((menuItem) => {
+				menuItem
+					.setTitle(t("task.action.addSubtask"))
+					.setIcon("list-plus")
+					.onClick(() => {
+						void this.createSubtask(item);
+					});
+			});
+
+			// 2. 编辑 (Edit)
+			menu.addItem((menuItem) => {
+				menuItem
+					.setTitle(t("task.action.edit"))
+					.setIcon("pencil")
+					.onClick(() => {
+						void this.editTask(item);
+					});
+			});
+
+			// 3. 进行中 (In progress)
+			const isInProgress = item.task.status.type === "IN_PROGRESS";
+			menu.addItem((menuItem) => {
+				const statusSettings = this.host.settings.statusSettings as any;
+				const allStatuses = [
+					...(statusSettings?.coreStatuses || []),
+					...(statusSettings?.customStatuses || [])
+				];
+				const inProgressStatus = allStatuses.find(s => s.type === "IN_PROGRESS") || { symbol: "/", name: "In progress" };
+				menuItem
+					.setTitle(t("task.action.inProgress"))
+					.setIcon("minus")
+					.setChecked(isInProgress)
+					.onClick(async () => {
+						const newSymbol = isInProgress ? " " : inProgressStatus.symbol;
+						await this.host.api.editTask(item.path, item.lineNumber, { statusSymbol: newSymbol });
+						await this.render();
+					});
+			});
+
+			// 4. 取消 (Cancel)
+			const isCancelled = item.task.status.type === "CANCELLED";
+			menu.addItem((menuItem) => {
+				menuItem
+					.setTitle(isCancelled ? t("task.action.uncancel") : t("task.action.cancel"))
+					.setIcon(isCancelled ? "rotate-ccw" : "circle-slash")
+					.onClick(async () => {
+						if (isCancelled) {
+							await this.host.api.uncancelTask(item.path, item.lineNumber);
+						} else {
+							await this.host.api.cancelTask(item.path, item.lineNumber);
+						}
+						await this.render();
+					});
+			});
+
+			// 5. 删除 (Delete)
+			menu.addItem((menuItem) => {
+				menuItem
+					.setTitle(t("task.action.delete"))
+					.setIcon("trash")
+					.onClick(() => {
+						new ConfirmModal(
+							this.appRef,
+							t("task.action.deleteConfirmTitle"),
+							t("task.action.deleteConfirmMessage").replace("{description}", item.task.metadata.description),
+							async () => {
+								await this.host.api.deleteTask(item.path, item.lineNumber);
+								await this.render();
+							}
+						).open();
+					});
+			});
+
+			menu.showAtMouseEvent(event);
+		});
+
 		if (item.hasChildren && this.expandedTasks.has(taskKey(item))) {
-			this.renderChildList(wrapper, item, isHideCompleted);
+			this.renderChildList(wrapper, item, filter);
 		}
 	}
 
@@ -273,39 +348,18 @@ export class TaskTodoTaskListView extends ItemView {
 		}
 	}
 
-	private renderItemActions(row: HTMLElement, item: TaskListItem): void {
-		const actions = row.createDiv({cls: "taskslite-list-actions"});
-		const addSubtaskButton = actions.createEl("button", {cls: "taskslite-list-action", attr: {"aria-label": t("task.action.addSubtask")}});
-		setIcon(addSubtaskButton, "list-plus");
-		addSubtaskButton.addEventListener("click", (event) => {
-			event.preventDefault();
-			event.stopPropagation();
-			void this.createSubtask(item);
-		});
-		const cancelButton = actions.createEl("button", {cls: "taskslite-list-action", attr: {"aria-label": t("task.action.cancel")}});
-		setIcon(cancelButton, item.task.status.type === "CANCELLED" ? "rotate-ccw" : "circle-slash");
-		cancelButton.addEventListener("click", (event) => {
-			event.preventDefault();
-			event.stopPropagation();
-			cancelButton.setAttr("disabled", "true");
-			void (async () => {
-				if (item.task.status.type === "CANCELLED") await this.host.api.uncancelTask(item.path, item.lineNumber);
-				else await this.host.api.cancelTask(item.path, item.lineNumber);
-				await this.render();
-			})();
-		});
-	}
-
-	private renderChildList(container: HTMLElement, item: TaskListItem, isHideCompleted: boolean): void {
+	private renderChildList(container: HTMLElement, item: TaskListItem, filter: FilterConfig): void {
 		let children = item.children.filter((child) => isVisibleTask(child));
-		if (isHideCompleted) {
+		if (filter.completed === "uncompleted") {
 			children = children.filter((child) => child.task.status.type !== "DONE");
+		} else if (filter.completed === "completed") {
+			children = children.filter((child) => child.task.status.type === "DONE");
 		}
 		if (children.length === 0) return;
 
 		const list = container.createDiv({cls: "taskslite-child-list"});
 		for (const child of children) {
-			this.renderTaskItem(list, child, isHideCompleted);
+			this.renderTaskItem(list, child, filter);
 		}
 	}
 
@@ -426,6 +480,125 @@ export class TaskTodoTaskListView extends ItemView {
 	}
 }
 
+export class ConfirmModal extends Modal {
+	constructor(
+		app: App,
+		private titleText: string,
+		private messageText: string,
+		private onConfirm: () => void,
+	) {
+		super(app);
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass("taskslite-confirm-modal");
+
+		contentEl.createEl("h2", { text: this.titleText });
+		contentEl.createEl("p", { text: this.messageText });
+
+		const buttonContainer = contentEl.createDiv({ cls: "taskslite-modal-buttons" });
+		
+		const cancelButton = buttonContainer.createEl("button", { text: t("common.cancel") || "Cancel" });
+		cancelButton.addEventListener("click", () => this.close());
+
+		const confirmButton = buttonContainer.createEl("button", {
+			text: t("common.confirm") || "Confirm",
+			cls: "mod-warning"
+		});
+		confirmButton.addEventListener("click", () => {
+			this.onConfirm();
+			this.close();
+		});
+	}
+
+	onClose() {
+		this.contentEl.empty();
+	}
+}
+
+function matchFilter(item: TaskListItem, filter: FilterConfig): boolean {
+	if (filter.completed === "completed" && item.task.status.type !== "DONE") {
+		return false;
+	}
+	if (filter.completed === "uncompleted" && item.task.status.type === "DONE") {
+		return false;
+	}
+
+	const today = todayString();
+	const { start, due, scheduled } = item.task.metadata.dates;
+
+	switch (filter.dates) {
+		case "today":
+			if (scheduled === today || due === today) return true;
+			if ((scheduled && scheduled < today) || (due && due < today)) return true;
+			if (start && due && start <= today && today <= due) return true;
+			return false;
+		case "tomorrow": {
+			const tomorrow = shiftDate(today, 1);
+			return scheduled === tomorrow || due === tomorrow;
+		}
+		case "this-week": {
+			const tomorrow = shiftDate(today, 1);
+			const nextWeek = shiftDate(today, 7);
+			const d = scheduled || due;
+			if (!d) return false;
+			return d >= tomorrow && d <= nextWeek;
+		}
+		case "overdue":
+			return Boolean((scheduled && scheduled < today) || (due && due < today));
+		case "later": {
+			const nextWeek = shiftDate(today, 7);
+			const d = scheduled || due;
+			if (!d) return false;
+			return d > nextWeek;
+		}
+		case "no-date":
+			return !scheduled && !due && !start;
+		case "has-date":
+			return scheduled !== null || due !== null;
+		case "custom": {
+			const d = scheduled || due;
+			if (!d) return false;
+			if (filter.customDateStart && d < filter.customDateStart) return false;
+			if (filter.customDateEnd && d > filter.customDateEnd) return false;
+			return true;
+		}
+		case "all":
+		default:
+			return true;
+	}
+}
+
+function groupTasksCustom(
+	tasks: TaskListItem[],
+	columns: ColumnConfig[],
+	collapsedGroups: Set<string>
+): TaskGroup[] {
+	const buckets: TaskGroup[] = columns.map(col => ({
+		id: col.id,
+		title: col.title,
+		items: [],
+		collapsed: collapsedGroups.has(col.id)
+	}));
+
+	for (const task of tasks) {
+		for (let idx = 0; idx < columns.length; idx++) {
+			const col = columns[idx];
+			if (col && matchFilter(task, col.filter)) {
+				const bucket = buckets[idx];
+				if (bucket) {
+					bucket.items.push(task);
+				}
+				break;
+			}
+		}
+	}
+
+	return buckets.filter(group => group.items.length > 0);
+}
+
 function taskRecordsToListItems(records: TaskTodoTaskRecord[]): TaskListItem[] {
 	const items: TaskListItem[] = records.map((record): TaskListItem => {
 		const {date, dateType} = taskListDate(record.task);
@@ -485,102 +658,6 @@ function otherMetadataParts(task: TaskTodoTaskLine): string[] {
 	return parts;
 }
 
-function groupTasks(
-	tasks: TaskListItem[],
-	activeTab: TaskListTabId,
-	collapsedGroups: Set<string>,
-	hideCompletedGroups: Set<string>,
-): TaskGroup[] {
-	if (activeTab === "today") {
-		const overdueItems = tasks.filter(isOverdueTask);
-		const todayItems = tasks.filter((task) => !isOverdueTask(task));
-
-		const overdueFiltered = overdueItems.filter((item) => {
-			if (hideCompletedGroups.has("today-overdue") && item.task.status.type === "DONE") {
-				return false;
-			}
-			return true;
-		});
-
-		const todayFiltered = todayItems.filter((item) => {
-			if (hideCompletedGroups.has("today") && item.task.status.type === "DONE") {
-				return false;
-			}
-			return true;
-		});
-
-		return [
-			{id: "today-overdue", title: t("taskTodo.group.overdue"), items: overdueFiltered, collapsed: collapsedGroups.has("today-overdue")},
-			{id: "today", title: t("taskTodo.group.today"), items: todayFiltered, collapsed: collapsedGroups.has("today")},
-		].filter((group) => group.items.length > 0);
-	}
-
-	const today = todayString();
-	const tomorrow = shiftDate(today, 1);
-	const nextWeek = shiftDate(today, 7);
-	const buckets: TaskGroup[] = [
-		{id: "overdue", title: t("taskTodo.group.earlier"), items: [], collapsed: collapsedGroups.has("overdue")},
-		{id: "today", title: t("taskTodo.group.today"), items: [], collapsed: collapsedGroups.has("today")},
-		{id: "tomorrow", title: t("taskTodo.group.tomorrow"), items: [], collapsed: collapsedGroups.has("tomorrow")},
-		{id: "week", title: t("taskTodo.group.next7Days"), items: [], collapsed: collapsedGroups.has("week")},
-		{id: "later", title: t("taskTodo.group.later"), items: [], collapsed: collapsedGroups.has("later")},
-		{id: "none", title: t("taskTodo.group.noDate"), items: [], collapsed: collapsedGroups.has("none")},
-	];
-
-	for (const task of tasks) {
-		const date = task.date;
-		let groupId = "none";
-		if (!date) groupId = "none";
-		else if (date < today) groupId = "overdue";
-		else if (date === today) groupId = "today";
-		else if (date === tomorrow) groupId = "tomorrow";
-		else if (date <= nextWeek) groupId = "week";
-		else groupId = "later";
-
-		if (hideCompletedGroups.has(groupId) && task.task.status.type === "DONE") {
-			continue;
-		}
-
-		const bucket = buckets.find((b) => b.id === groupId);
-		if (bucket) {
-			bucket.items.push(task);
-		}
-	}
-
-	return buckets.filter((group) => group.items.length > 0);
-}
-
-function taskListTabs(): TaskListTab[] {
-	return [
-		{id: "in-plan", title: t("taskTodo.tab.inPlan")},
-		{id: "today", title: t("taskTodo.tab.today")},
-	];
-}
-
-function filterTasksForTab(tasks: TaskListItem[], activeTab: TaskListTabId): TaskListItem[] {
-	return activeTab === "today" ? tasks.filter(isTodayTask) : tasks.filter(isInPlanTask);
-}
-
-function isInPlanTask(item: TaskListItem): boolean {
-	return item.task.metadata.dates.scheduled !== null || item.task.metadata.dates.due !== null;
-}
-
-function isTodayTask(item: TaskListItem): boolean {
-	const today = todayString();
-	const {start, due, scheduled} = item.task.metadata.dates;
-	if (scheduled === today || due === today) return true;
-	if ((scheduled && scheduled < today) || (due && due < today)) return true;
-	if (!start || !due) return false;
-	return start <= today && today <= due;
-}
-
-function isOverdueTask(item: TaskListItem): boolean {
-	const today = todayString();
-	const {scheduled, due} = item.task.metadata.dates;
-	return Boolean((scheduled && scheduled < today) || (due && due < today));
-}
-
-
 function taskKey(item: Pick<TaskListItem, "path" | "lineNumber">): string {
 	return `${item.path}:${item.lineNumber}`;
 }
@@ -592,7 +669,6 @@ function shiftDate(value: string, amount: number): string {
 	date.setUTCDate(date.getUTCDate() + amount);
 	return `${date.getUTCFullYear().toString().padStart(4, "0")}-${(date.getUTCMonth() + 1).toString().padStart(2, "0")}-${date.getUTCDate().toString().padStart(2, "0")}`;
 }
-
 
 function applyTaskStatusIcon(container: HTMLElement, statusType: string): void {
 	container.empty();

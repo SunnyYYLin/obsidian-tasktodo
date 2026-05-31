@@ -1,4 +1,4 @@
-import { Notice, Plugin, PluginSettingTab, Setting, Editor, MarkdownView, TFile } from "obsidian";
+import { Notice, Plugin, PluginSettingTab, Setting, Editor, MarkdownView, TFile, App, Modal } from "obsidian";
 import { t, type I18nKey } from "./i18n";
 import { getTaskLiteHost, type TaskTodoHost, type CreateTaskInput } from "./host";
 import { TASKTODO_VIEW, TaskTodoTaskListView } from "./taskTodo/taskListView";
@@ -6,12 +6,35 @@ import { openTaskLineModal, openTaskLineModalWithTarget, type TaskLineModalResul
 import { type SortKey } from "./taskTodo/taskTodoSort";
 import { fieldsFromTaskLine, type StatusRegistry } from "./taskTodo/taskLineFields";
 
+export interface FilterConfig {
+	completed: "all" | "completed" | "uncompleted";
+	dates: "all" | "today" | "tomorrow" | "this-week" | "no-date" | "overdue" | "has-date" | "later" | "custom";
+	customDateStart?: string;
+	customDateEnd?: string;
+}
+
+export interface TabConfig {
+	id: string;
+	title: string;
+	filter: FilterConfig;
+}
+
+export interface ColumnConfig {
+	id: string;
+	title: string;
+	filter: FilterConfig;
+}
+
 export interface TaskTodoSettings {
 	sortOrder: SortKey[];
+	tabs: TabConfig[];
+	columns: ColumnConfig[];
 }
 
 export const DEFAULT_SETTINGS: TaskTodoSettings = {
 	sortOrder: ["date", "cancelled", "importance", "lifeLength"],
+	tabs: [],
+	columns: [],
 };
 
 export default class TaskTodoPlugin extends Plugin {
@@ -116,7 +139,56 @@ export default class TaskTodoPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const data = await this.loadData();
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+		if (!this.settings.tabs || this.settings.tabs.length === 0) {
+			this.settings.tabs = [
+				{
+					id: "in-plan",
+					title: t("taskTodo.tab.inPlan"),
+					filter: { completed: "uncompleted", dates: "has-date" }
+				},
+				{
+					id: "today",
+					title: t("taskTodo.tab.today"),
+					filter: { completed: "uncompleted", dates: "today" }
+				}
+			];
+		}
+		if (!this.settings.columns || this.settings.columns.length === 0) {
+			this.settings.columns = [
+				{
+					id: "overdue",
+					title: t("taskTodo.group.overdue"),
+					filter: { completed: "all", dates: "overdue" }
+				},
+				{
+					id: "today",
+					title: t("taskTodo.group.today"),
+					filter: { completed: "all", dates: "today" }
+				},
+				{
+					id: "tomorrow",
+					title: t("taskTodo.group.tomorrow"),
+					filter: { completed: "all", dates: "tomorrow" }
+				},
+				{
+					id: "week",
+					title: t("taskTodo.group.next7Days"),
+					filter: { completed: "all", dates: "this-week" }
+				},
+				{
+					id: "later",
+					title: t("taskTodo.group.later"),
+					filter: { completed: "all", dates: "later" }
+				},
+				{
+					id: "no-date",
+					title: t("taskTodo.group.noDate"),
+					filter: { completed: "all", dates: "no-date" }
+				}
+			];
+		}
 	}
 
 	async saveSettings(): Promise<void> {
@@ -419,5 +491,340 @@ class TaskTodoSettingTab extends PluginSettingTab {
 		};
 
 		renderList();
+
+		// Tabs settings
+		containerEl.createEl("h3", { text: t("settings.tabs.title") });
+		new Setting(containerEl)
+			.setDesc(t("settings.tabs.desc"))
+			.addButton((button) =>
+				button
+					.setButtonText(t("settings.add"))
+					.setCta()
+					.onClick(() => {
+						const newTab: TabConfig = {
+							id: "tab_" + Date.now(),
+							title: "New Tab",
+							filter: { completed: "all", dates: "all" }
+						};
+						new TabOrColumnModal(this.app, newTab, async (result) => {
+							const tab: TabConfig = {
+								id: newTab.id,
+								title: result.title,
+								filter: result.filter
+							};
+							this.plugin.settings.tabs.push(tab);
+							await this.plugin.saveSettings();
+							this.display();
+						}).open();
+					})
+			);
+
+		const tabsContainer = containerEl.createDiv({ cls: "tasktodo-sort-container" });
+		const renderTabsList = () => {
+			tabsContainer.empty();
+			this.plugin.settings.tabs.forEach((tab, index) => {
+				const itemEl = tabsContainer.createDiv({ cls: "tasktodo-sort-item" });
+				itemEl.setAttribute("draggable", "true");
+				itemEl.setAttribute("data-id", tab.id);
+				itemEl.setAttribute("data-index", String(index));
+
+				itemEl.createDiv({ cls: "tasktodo-sort-item-handle", text: "⋮⋮" });
+				
+				const titleContainer = itemEl.createDiv({ cls: "tasktodo-sort-item-title" });
+				titleContainer.createEl("strong", { text: tab.title });
+				const filterDesc = `[Completed: ${tab.filter.completed}, Dates: ${tab.filter.dates}]`;
+				titleContainer.createEl("span", { text: ` ${filterDesc}`, cls: "taskslite-list-parent" });
+
+				const actionsEl = itemEl.createDiv({ cls: "tasktodo-sort-item-actions" });
+
+				const editBtn = actionsEl.createEl("button", {
+					cls: "tasktodo-sort-item-btn",
+					text: "✏️",
+					title: t("settings.edit")
+				});
+				editBtn.addEventListener("click", (e) => {
+					e.stopPropagation();
+					new TabOrColumnModal(this.app, tab, async (result) => {
+						tab.title = result.title;
+						tab.filter = result.filter;
+						await this.plugin.saveSettings();
+						this.display();
+					}).open();
+				});
+
+				const delBtn = actionsEl.createEl("button", {
+					cls: "tasktodo-sort-item-btn",
+					text: "❌",
+					title: t("settings.delete")
+				});
+				delBtn.addEventListener("click", async (e) => {
+					e.stopPropagation();
+					this.plugin.settings.tabs.splice(index, 1);
+					await this.plugin.saveSettings();
+					this.display();
+				});
+
+				itemEl.addEventListener("dragstart", (e) => {
+					if (e.dataTransfer) {
+						e.dataTransfer.setData("text/plain", String(index));
+						e.dataTransfer.effectAllowed = "move";
+					}
+					itemEl.addClass("is-dragging");
+				});
+
+				itemEl.addEventListener("dragend", async () => {
+					itemEl.removeClass("is-dragging");
+					const childElements = Array.from(tabsContainer.querySelectorAll(".tasktodo-sort-item"));
+					const newTabs = childElements
+						.map((el) => {
+							const id = el.getAttribute("data-id");
+							return this.plugin.settings.tabs.find((t) => t.id === id);
+						})
+						.filter(Boolean) as TabConfig[];
+
+					this.plugin.settings.tabs = newTabs;
+					await this.plugin.saveSettings();
+					this.display();
+				});
+
+				itemEl.addEventListener("dragover", (e) => {
+					e.preventDefault();
+					const draggingEl = tabsContainer.querySelector(".is-dragging") as HTMLElement;
+					if (!draggingEl || draggingEl === itemEl) return;
+
+					const rect = itemEl.getBoundingClientRect();
+					const next = (e.clientY - rect.top) / rect.height > 0.5;
+					tabsContainer.insertBefore(draggingEl, next ? itemEl.nextSibling : itemEl);
+				});
+			});
+		};
+		renderTabsList();
+
+		// Columns settings
+		containerEl.createEl("h3", { text: t("settings.columns.title") });
+		new Setting(containerEl)
+			.setDesc(t("settings.columns.desc"))
+			.addButton((button) =>
+				button
+					.setButtonText(t("settings.add"))
+					.setCta()
+					.onClick(() => {
+						const newCol: ColumnConfig = {
+							id: "col_" + Date.now(),
+							title: "New Column",
+							filter: { completed: "all", dates: "all" }
+						};
+						new TabOrColumnModal(this.app, newCol, async (result) => {
+							const col: ColumnConfig = {
+								id: newCol.id,
+								title: result.title,
+								filter: result.filter
+							};
+							this.plugin.settings.columns.push(col);
+							await this.plugin.saveSettings();
+							this.display();
+						}).open();
+					})
+			);
+
+		const colsContainer = containerEl.createDiv({ cls: "tasktodo-sort-container" });
+		const renderColsList = () => {
+			colsContainer.empty();
+			this.plugin.settings.columns.forEach((col, index) => {
+				const itemEl = colsContainer.createDiv({ cls: "tasktodo-sort-item" });
+				itemEl.setAttribute("draggable", "true");
+				itemEl.setAttribute("data-id", col.id);
+				itemEl.setAttribute("data-index", String(index));
+
+				itemEl.createDiv({ cls: "tasktodo-sort-item-handle", text: "⋮⋮" });
+				
+				const titleContainer = itemEl.createDiv({ cls: "tasktodo-sort-item-title" });
+				titleContainer.createEl("strong", { text: col.title });
+				const filterDesc = `[Completed: ${col.filter.completed}, Dates: ${col.filter.dates}]`;
+				titleContainer.createEl("span", { text: ` ${filterDesc}`, cls: "taskslite-list-parent" });
+
+				const actionsEl = itemEl.createDiv({ cls: "tasktodo-sort-item-actions" });
+
+				const editBtn = actionsEl.createEl("button", {
+					cls: "tasktodo-sort-item-btn",
+					text: "✏️",
+					title: t("settings.edit")
+				});
+				editBtn.addEventListener("click", (e) => {
+					e.stopPropagation();
+					new TabOrColumnModal(this.app, col, async (result) => {
+						col.title = result.title;
+						col.filter = result.filter;
+						await this.plugin.saveSettings();
+						this.display();
+					}).open();
+				});
+
+				const delBtn = actionsEl.createEl("button", {
+					cls: "tasktodo-sort-item-btn",
+					text: "❌",
+					title: t("settings.delete")
+				});
+				delBtn.addEventListener("click", async (e) => {
+					e.stopPropagation();
+					this.plugin.settings.columns.splice(index, 1);
+					await this.plugin.saveSettings();
+					this.display();
+				});
+
+				itemEl.addEventListener("dragstart", (e) => {
+					if (e.dataTransfer) {
+						e.dataTransfer.setData("text/plain", String(index));
+						e.dataTransfer.effectAllowed = "move";
+					}
+					itemEl.addClass("is-dragging");
+				});
+
+				itemEl.addEventListener("dragend", async () => {
+					itemEl.removeClass("is-dragging");
+					const childElements = Array.from(colsContainer.querySelectorAll(".tasktodo-sort-item"));
+					const newCols = childElements
+						.map((el) => {
+							const id = el.getAttribute("data-id");
+							return this.plugin.settings.columns.find((c) => c.id === id);
+						})
+						.filter(Boolean) as ColumnConfig[];
+
+					this.plugin.settings.columns = newCols;
+					await this.plugin.saveSettings();
+					this.display();
+				});
+
+				itemEl.addEventListener("dragover", (e) => {
+					e.preventDefault();
+					const draggingEl = colsContainer.querySelector(".is-dragging") as HTMLElement;
+					if (!draggingEl || draggingEl === itemEl) return;
+
+					const rect = itemEl.getBoundingClientRect();
+					const next = (e.clientY - rect.top) / rect.height > 0.5;
+					colsContainer.insertBefore(draggingEl, next ? itemEl.nextSibling : itemEl);
+				});
+			});
+		};
+		renderColsList();
+	}
+}
+
+class TabOrColumnModal extends Modal {
+	private result: {
+		title: string;
+		filter: FilterConfig;
+	};
+
+	constructor(
+		app: App,
+		private initialData: { title: string; filter: FilterConfig },
+		private onSave: (data: { title: string; filter: FilterConfig }) => void
+	) {
+		super(app);
+		this.result = JSON.parse(JSON.stringify(initialData));
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.addClass("taskslite-modal");
+
+		this.setTitle(t("modal.editConfig"));
+
+		new Setting(contentEl)
+			.setName(t("modal.name"))
+			.addText((text) =>
+				text
+					.setValue(this.result.title)
+					.onChange((val) => {
+						this.result.title = val;
+					})
+			);
+
+		new Setting(contentEl)
+			.setName(t("taskTodo.filterCompleted"))
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("all", t("taskTodo.datesFilter.all"))
+					.addOption("uncompleted", t("taskTodo.hideCompleted"))
+					.addOption("completed", t("taskTodo.showCompleted"))
+					.setValue(this.result.filter.completed)
+					.onChange((val) => {
+						this.result.filter.completed = val as any;
+					})
+			);
+
+		const customDateSettingContainer = contentEl.createDiv();
+		
+		const renderCustomDates = () => {
+			customDateSettingContainer.empty();
+			if (this.result.filter.dates === "custom") {
+				new Setting(customDateSettingContainer)
+					.setName(t("modal.startDate"))
+					.addText((text) => {
+						text.inputEl.type = "date";
+						text.setValue(this.result.filter.customDateStart || "")
+							.onChange((val) => {
+								this.result.filter.customDateStart = val;
+							});
+					});
+				new Setting(customDateSettingContainer)
+					.setName(t("modal.dueDate"))
+					.addText((text) => {
+						text.inputEl.type = "date";
+						text.setValue(this.result.filter.customDateEnd || "")
+							.onChange((val) => {
+								this.result.filter.customDateEnd = val;
+							});
+					});
+			}
+		};
+
+		new Setting(contentEl)
+			.setName(t("taskTodo.datesFilter"))
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("all", t("taskTodo.datesFilter.all"))
+					.addOption("today", t("taskTodo.datesFilter.today"))
+					.addOption("tomorrow", t("taskTodo.datesFilter.tomorrow"))
+					.addOption("this-week", t("taskTodo.datesFilter.thisWeek"))
+					.addOption("overdue", t("taskTodo.datesFilter.overdue"))
+					.addOption("later", t("taskTodo.group.later"))
+					.addOption("no-date", t("taskTodo.datesFilter.noDate"))
+					.addOption("has-date", t("taskTodo.tab.inPlan"))
+					.addOption("custom", t("taskTodo.datesFilter.custom"))
+					.setValue(this.result.filter.dates)
+					.onChange((val) => {
+						this.result.filter.dates = val as any;
+						renderCustomDates();
+					})
+			);
+
+		renderCustomDates();
+
+		new Setting(contentEl)
+			.addButton((button) =>
+				button
+					.setButtonText(t("common.cancel"))
+					.onClick(() => this.close())
+			)
+			.addButton((button) =>
+				button
+					.setButtonText(t("common.save"))
+					.setCta()
+					.onClick(() => {
+						if (!this.result.title.trim()) {
+							new Notice("Title cannot be empty");
+							return;
+						}
+						this.onSave(this.result);
+						this.close();
+					})
+			);
+	}
+
+	onClose() {
+		this.contentEl.empty();
 	}
 }
