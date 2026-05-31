@@ -1,6 +1,6 @@
 import type { TaskTodoTaskLine } from "./host";
 
-export { getTaskLiteHost, TASKLITE_PLUGIN_ID, type TaskTodoCoreApi, type TaskTodoHost, type TaskTodoTaskRecord, type TaskTodoTaskLine, type EditTaskPatch } from "./host";
+export { getTaskLiteHost, TASKLITE_PLUGIN_ID, type TaskTodoCoreApi, type TaskTodoHost, type TaskTodoTaskRecord, type TaskTodoTaskLine, type EditTaskPatch, type CreateTaskInput } from "./host";
 
 export const TASK_SYMBOLS = {
 	priority: {

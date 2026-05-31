@@ -36,16 +36,31 @@ export interface TaskTodoTaskRecord {
 	task: TaskTodoTaskLine;
 }
 
+export interface CreateTaskInput {
+	description: string;
+	status?: string;
+	priority?: string | null;
+	dates?: {
+		start?: string | null;
+		scheduled?: string | null;
+		due?: string | null;
+	};
+	recurrence?: string | null;
+	onCompletion?: string | null;
+	id?: string | null;
+	dependsOn?: string | null;
+	path?: string;
+	parentLineNumber?: number;
+}
+
+/** Partial patch for task metadata fields. Omitted keys are left unchanged. */
 export interface EditTaskPatch {
 	description?: string;
 	priority?: string | null;
 	dates?: {
 		start?: string | null;
-		created?: string | null;
 		scheduled?: string | null;
 		due?: string | null;
-		done?: string | null;
-		cancelled?: string | null;
 	};
 	recurrence?: string | null;
 	onCompletion?: string | null;
@@ -63,7 +78,7 @@ export interface TaskTodoCoreApi {
 	unfinishTask(path: string, lineNumber: number): Promise<boolean>;
 	cancelTask(path: string, lineNumber: number): Promise<boolean>;
 	uncancelTask(path: string, lineNumber: number): Promise<boolean>;
-	createTask(line: string, options?: {path?: string; parentLineNumber?: number}): Promise<void>;
+	createTask(input: CreateTaskInput): Promise<void>;
 	deleteTask(path: string, lineNumber: number): Promise<boolean>;
 	editTask(path: string, lineNumber: number, patch: EditTaskPatch): Promise<boolean>;
 	executeTasksToggleCommand(line: string, path: string): string;

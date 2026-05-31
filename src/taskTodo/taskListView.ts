@@ -1,6 +1,6 @@
 import { ItemView, Notice, setIcon, type App, type WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
-import { TASK_SYMBOLS, serializeTaskLine, todayString, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord, type EditTaskPatch } from "../taskLiteInterop";
+import { TASK_SYMBOLS, serializeTaskLine, todayString, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord, type EditTaskPatch, type CreateTaskInput } from "../taskLiteInterop";
 import { compareTaskTodoItems } from "./taskTodoSort";
 import type TaskTodoPlugin from "../main";
 import { openTaskLineModal as openLocalTaskLineModal, openTaskLineModalWithTarget, type TaskLineModalResult, type TaskLiteSettings } from "./taskLineModal";
@@ -319,11 +319,8 @@ export class TaskTodoTaskListView extends ItemView {
 			priority: fields.priority || null,
 			dates: {
 				start: fields.start || null,
-				created: fields.created || null,
 				scheduled: fields.scheduled || null,
 				due: fields.due || null,
-				done: fields.done || null,
-				cancelled: fields.cancelled || null,
 			},
 			recurrence: fields.recurrence || null,
 			onCompletion: fields.onCompletion || null,
@@ -376,8 +373,24 @@ export class TaskTodoTaskListView extends ItemView {
 			defaultValue: "Tasks",
 		});
 		if (!result || !result.line) return;
+		const fields = fieldsFromTaskLine(result.line, this.host.statusRegistry as unknown as StatusRegistry);
+		const input: CreateTaskInput = {
+			description: fields.description,
+			status: fields.statusSymbol,
+			priority: fields.priority || null,
+			dates: {
+				start: fields.start || null,
+				scheduled: fields.scheduled || null,
+				due: fields.due || null,
+			},
+			recurrence: fields.recurrence || null,
+			onCompletion: fields.onCompletion || null,
+			id: fields.id || null,
+			dependsOn: fields.dependsOn || null,
+			path: result.targetPath || "Tasks.md",
+		};
 		try {
-			await this.host.api.createTask(result.line, {path: result.targetPath || "Tasks.md"});
+			await this.host.api.createTask(input);
 		} catch (error) {
 			new Notice(t("notice.inboxPathFolder"));
 			console.warn("TaskTodo failed to create inbox task", error);
@@ -388,8 +401,25 @@ export class TaskTodoTaskListView extends ItemView {
 	private async createSubtask(parent: TaskListItem): Promise<void> {
 		const line = await openTaskLineModal(this.host, this.appRef, "", t("taskTodo.createTask"));
 		if (!line) return;
+		const fields = fieldsFromTaskLine(line, this.host.statusRegistry as unknown as StatusRegistry);
+		const input: CreateTaskInput = {
+			description: fields.description,
+			status: fields.statusSymbol,
+			priority: fields.priority || null,
+			dates: {
+				start: fields.start || null,
+				scheduled: fields.scheduled || null,
+				due: fields.due || null,
+			},
+			recurrence: fields.recurrence || null,
+			onCompletion: fields.onCompletion || null,
+			id: fields.id || null,
+			dependsOn: fields.dependsOn || null,
+			path: parent.path,
+			parentLineNumber: parent.lineNumber,
+		};
 		try {
-			await this.host.api.createTask(line, {path: parent.path, parentLineNumber: parent.lineNumber});
+			await this.host.api.createTask(input);
 		} catch (error) {
 			new Notice(t("notice.inboxPathFolder"));
 			console.warn("TaskTodo failed to create subtask", error);
