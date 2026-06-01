@@ -1,10 +1,11 @@
-import { ItemView, Menu, Modal, setIcon, TFile, type App, type WorkspaceLeaf } from "obsidian";
+import { ItemView, Menu, Modal, Notice, setIcon, TFile, type App, type WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
-import { TASK_SYMBOLS, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord } from "../taskLiteInterop";
+import { TASK_SYMBOLS, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord, type CreateTaskInput, type EditTaskPatch } from "../taskLiteInterop";
 import { compareTaskTodoItems } from "./taskTodoSort";
 import type TaskTodoPlugin from "../main";
 import type { ColumnConfig } from "../main";
 import { matchFilterWithDQL, type TaskListItem } from "./taskTodoFilter";
+import { TaskFormModal } from "./taskFormModal";
 
 export const TASKTODO_VIEW = "tasktodo-task-list";
 
@@ -122,6 +123,14 @@ export class TaskTodoTaskListView extends ItemView {
 
 		const actions = header.createDiv({cls: "taskslite-list-header-actions"});
 
+		const addButton = actions.createEl("button", {cls: "taskslite-add-task", attr: {"aria-label": t("taskTodo.addTask")}});
+		const addIcon = addButton.createSpan();
+		setIcon(addIcon, "plus");
+		addButton.createSpan({text: t("taskTodo.addTask")});
+		addButton.addEventListener("click", () => {
+			this.createInboxTask();
+		});
+
 		const refreshButton = actions.createEl("button", {cls: "taskslite-refresh-tasks", attr: {"aria-label": t("taskTodo.refresh")}});
 		const refreshIcon = refreshButton.createSpan();
 		setIcon(refreshIcon, "refresh-cw");
@@ -218,6 +227,26 @@ export class TaskTodoTaskListView extends ItemView {
 			event.stopPropagation();
 			
 			const menu = new Menu();
+
+			// 1. 添加子任务 (Add subtask)
+			menu.addItem((menuItem) => {
+				menuItem
+					.setTitle(t("task.action.addSubtask"))
+					.setIcon("list-plus")
+					.onClick(() => {
+						this.createSubtask(item);
+					});
+			});
+
+			// 2. 编辑 (Edit)
+			menu.addItem((menuItem) => {
+				menuItem
+					.setTitle(t("task.action.edit"))
+					.setIcon("pencil")
+					.onClick(() => {
+						this.editTask(item);
+					});
+			});
 
 			// 3. 进行中 (In progress)
 			const isInProgress = item.task.status === "IN_PROGRESS";
@@ -354,6 +383,116 @@ export class TaskTodoTaskListView extends ItemView {
 		const items = taskRecordsToListItems(records).filter(isVisibleTask);
 		const sortKeys = this.plugin.settings.sortOrder;
 		return items.sort((a, b) => compareTaskTodoItems(a, b, sortKeys));
+	}
+
+	private createInboxTask(): void {
+		new TaskFormModal(
+			this.appRef,
+			this.host,
+			t("taskTodo.createTask"),
+			"create",
+			(data, targetPath) => {
+				void (async () => {
+					const input: CreateTaskInput = {
+						description: data.description,
+						status: data.statusSymbol,
+						priority: data.priority || null,
+						dates: {
+							start: data.startDate || null,
+							scheduled: data.scheduledDate || null,
+							due: data.dueDate || null,
+						},
+						recurrence: data.recurrence || null,
+						onCompletion: data.onCompletion || null,
+						id: data.id || null,
+						dependsOn: data.dependsOn || null,
+						person: data.person,
+						path: targetPath || "Tasks.md",
+					};
+					try {
+						await this.host.api.createTask(input);
+					} catch (error) {
+						new Notice(t("notice.inboxPathFolder"));
+						console.warn("TaskTodo failed to create inbox task", error);
+					}
+					await this.render();
+				})();
+			},
+			{ path: "Tasks.md" }
+		).open();
+	}
+
+	private createSubtask(parent: TaskListItem): void {
+		new TaskFormModal(
+			this.appRef,
+			this.host,
+			t("taskTodo.createTask"),
+			"create",
+			(data) => {
+				void (async () => {
+					const input: CreateTaskInput = {
+						description: data.description,
+						status: data.statusSymbol,
+						priority: data.priority || null,
+						dates: {
+							start: data.startDate || null,
+							scheduled: data.scheduledDate || null,
+							due: data.dueDate || null,
+						},
+						recurrence: data.recurrence || null,
+						onCompletion: data.onCompletion || null,
+						id: data.id || null,
+						dependsOn: data.dependsOn || null,
+						person: data.person,
+						path: parent.path,
+						parentLineNumber: parent.lineNumber,
+					};
+					try {
+						await this.host.api.createTask(input);
+					} catch (error) {
+						new Notice(t("notice.inboxPathFolder"));
+						console.warn("TaskTodo failed to create subtask", error);
+					}
+					await this.render();
+				})();
+			},
+			{ path: parent.path, parentLineNumber: parent.lineNumber }
+		).open();
+	}
+
+	private editTask(item: TaskListItem): void {
+		new TaskFormModal(
+			this.appRef,
+			this.host,
+			t("command.editTask"),
+			"edit",
+			(data) => {
+				void (async () => {
+					const patch: EditTaskPatch = {
+						description: data.description,
+						priority: data.priority || null,
+						dates: {
+							start: data.startDate || null,
+							scheduled: data.scheduledDate || null,
+							due: data.dueDate || null,
+						},
+						recurrence: data.recurrence || null,
+						onCompletion: data.onCompletion || null,
+						id: data.id || null,
+						dependsOn: data.dependsOn || null,
+						person: data.person,
+					};
+					await this.host.api.editTask(item.path, item.lineNumber, patch);
+
+					const currentSymbol = this.host.statusRegistry.getByType(item.task.status).symbol;
+					if (data.statusSymbol !== currentSymbol) {
+						await this.host.api.updateTaskStatus(item.path, item.lineNumber, data.statusSymbol);
+					}
+					await this.render();
+				})();
+			},
+			{ task: item.task }
+		).open();
 	}
 
 }
