@@ -202,8 +202,13 @@ export function matchFilterWithDQL(
 				hasChildren: item.hasChildren,
 				task: item.task,
 			};
-			const result = host.api.filterTasks([record], preprocessed);
-			return result.length > 0;
+			try {
+				const result = host.api.filterTasks([record], preprocessed);
+				return result.length > 0;
+			} catch (err) {
+				console.warn("DQL filter matching failed for query:", query, err);
+				return false;
+			}
 		}
 	}
 	return filter ? matchFilter(item, filter) : true;
