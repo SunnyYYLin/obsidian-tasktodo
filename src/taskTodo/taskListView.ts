@@ -359,7 +359,7 @@ export class TaskTodoTaskListView extends ItemView {
 
 	private async editTask(item: TaskListItem): Promise<void> {
 		const currentLine = serializeTaskLine(item.task, this.host.statusRegistry);
-		const updatedLine = await openTaskLineModal(this.host, this.appRef, currentLine, t("taskTodo.createTask"));
+		const updatedLine = await openTaskLineModal(this.host, this.appRef, currentLine, t("command.editTask"));
 		if (!updatedLine || updatedLine === currentLine) return;
 
 		const fields = fieldsFromTaskLine(updatedLine, this.host.statusRegistry as unknown as StatusRegistry);
