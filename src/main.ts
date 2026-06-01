@@ -18,6 +18,7 @@ export interface FilterConfig {
 	priority: string[];
 	text?: string;
 	tag?: string;
+	assignee?: string;
 	dateFilterRelation?: "or" | "and";
 	startDate: DateFilterField;
 	scheduledDate: DateFilterField;
@@ -247,11 +248,27 @@ export default class TaskTodoPlugin extends Plugin {
 				if (!tab.queryMode) {
 					tab.queryMode = "gui";
 				}
-				if (!tab.query || tab.query.trim() === "") {
-					tab.query = getEnforcedTabDQL(tab.id);
+				if (!tab.filter) {
+					tab.filter = getEnforcedTabFilter(tab.id);
 				}
-				tab.filter = getEnforcedTabFilter(tab.id);
-				tab.columns = alignTabColumns(tab.id, tab.columns || []);
+				if (!tab.query || tab.query.trim() === "") {
+					tab.query = filterConfigToDQL(tab.filter);
+				}
+				if (!tab.columns || tab.columns.length === 0) {
+					tab.columns = tab.id === "today" ? createDefaultTodayColumns() : createDefaultInPlanColumns();
+				} else {
+					for (const col of tab.columns) {
+						if (!col.queryMode) {
+							col.queryMode = "gui";
+						}
+						if (!col.filter) {
+							col.filter = getEnforcedColumnFilter(col.id);
+						}
+						if (!col.query || col.query.trim() === "") {
+							col.query = filterConfigToDQL(col.filter);
+						}
+					}
+				}
 			}
 		}
 	}
@@ -259,22 +276,12 @@ export default class TaskTodoPlugin extends Plugin {
 	async saveSettings(): Promise<void> {
 		if (this.settings.tabs) {
 			for (const tab of this.settings.tabs) {
-				if (tab.id === "today" || tab.id === "in-plan") {
-					tab.filter = getEnforcedTabFilter(tab.id);
-				}
 				if (tab.queryMode === "gui" || !tab.queryMode) {
 					tab.queryMode = "gui";
 					tab.query = filterConfigToDQL(tab.filter);
 				}
 				if (tab.columns) {
 					for (const col of tab.columns) {
-						const key = getColumnKey(col.id);
-						if (key && (tab.id === "today" || tab.id === "in-plan")) {
-							col.filter = getEnforcedColumnFilter(col.id);
-							if (col.id.startsWith("overdue")) {
-								col.title = tab.id === "today" ? (t("taskTodo.group.overdue") || "已过期") : (t("taskTodo.group.earlier") || "早前");
-							}
-						}
 						if (col.queryMode === "gui" || !col.queryMode) {
 							col.queryMode = "gui";
 							col.query = filterConfigToDQL(col.filter);
@@ -1042,6 +1049,17 @@ export const filterConfigToDQL = (filter: FilterConfig): string => {
 			dateParts.push(`${name} <= date(today)`);
 		} else if (field.mode === "later") {
 			dateParts.push(`${name} > date(next-week)`);
+		} else if (field.mode === "custom") {
+			const conds: string[] = [];
+			if (field.customStart) {
+				conds.push(`${name} >= date("${field.customStart}")`);
+			}
+			if (field.customEnd) {
+				conds.push(`${name} <= date("${field.customEnd}")`);
+			}
+			if (conds.length > 0) {
+				dateParts.push(`(${conds.join(" AND ")})`);
+			}
 		}
 	};
 
@@ -1062,6 +1080,11 @@ export const filterConfigToDQL = (filter: FilterConfig): string => {
 	// 6. Tag filter
 	if (filter.tag && filter.tag.trim() !== "") {
 		parts.push(`tags contains "${filter.tag}"`);
+	}
+
+	// 7. Assignee filter
+	if (filter.assignee && filter.assignee.trim() !== "") {
+		parts.push(`person = "${filter.assignee.replace(/"/g, '\\"')}"`);
 	}
 
 	return parts.join(" AND ");
@@ -1235,6 +1258,30 @@ class TabOrColumnModal extends Modal {
 		btnGui.addEventListener("click", () => setActiveTab("gui"));
 		btnAdvanced.addEventListener("click", () => setActiveTab("advanced"));
 
+		// ------------------ Advanced Tab Content ------------------
+		contentAdvanced.createEl("div", {
+			text: "直接编辑过滤任务的 DQL 查询语句。支持 status, priority, due, scheduled, start, path, tags 等字段。",
+			attr: { style: "font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;" }
+		});
+
+		const textarea = contentAdvanced.createEl("textarea", {
+			cls: "tasktodo-advanced-textarea",
+			value: this.result.query || ""
+		});
+		textarea.placeholder = 'e.g. status = "TODO" AND due <= date(today)';
+		textarea.addEventListener("input", () => {
+			this.result.query = textarea.value;
+		});
+
+		// Synchronization helper: compiles GUI FilterConfig to DQL string
+		const updateDQL = () => {
+			if (this.result.queryMode === "gui") {
+				const q = filterConfigToDQL(this.result.filter);
+				this.result.query = q;
+				textarea.value = q;
+			}
+		};
+
 		// ------------------ GUI Tab Content ------------------
 		// Status Settings
 		new Setting(contentGui)
@@ -1247,6 +1294,7 @@ class TabOrColumnModal extends Modal {
 					.setValue(this.result.filter.completed)
 					.onChange((val) => {
 						this.result.filter.completed = val as any;
+						updateDQL();
 					});
 			});
 
@@ -1260,6 +1308,7 @@ class TabOrColumnModal extends Modal {
 					.setValue(this.result.filter.cancelled)
 					.onChange((val) => {
 						this.result.filter.cancelled = val as any;
+						updateDQL();
 					});
 			});
 
@@ -1295,6 +1344,7 @@ class TabOrColumnModal extends Modal {
 				} else {
 					this.result.filter.priority = current.filter(k => k !== pri.key);
 				}
+				updateDQL();
 			});
 		});
 
@@ -1309,18 +1359,45 @@ class TabOrColumnModal extends Modal {
 			{ mode: "today-or-overdue", label: "今天或逾期 (Today/Overdue)" },
 			{ mode: "has-date", label: "有日期 (Has Date)" },
 			{ mode: "later", label: "以后 (Later)" },
+			{ mode: "custom", label: "自定义范围 (Custom Range)" },
 		];
 
 		const addDateDropdown = (name: string, field: DateFilterField) => {
-			new Setting(contentGui)
+			const container = contentGui.createDiv({ attr: { style: "margin-bottom: 0.75rem;" } });
+			new Setting(container)
 				.setName(name)
 				.addDropdown((dropdown) => {
 					dateOptions.forEach(opt => dropdown.addOption(opt.mode, opt.label));
 					dropdown.setValue(field.mode || "all");
 					dropdown.onChange((val) => {
 						field.mode = val as any;
+						updateCustomDateVisibility();
+						updateDQL();
 					});
 				});
+
+			const rangeDiv = container.createDiv({ attr: { style: "display: flex; gap: 1rem; padding-left: 1.5rem; margin-top: 0.5rem;" } });
+			
+			const startInput = rangeDiv.createEl("input", { type: "date", value: field.customStart || "" });
+			const endInput = rangeDiv.createEl("input", { type: "date", value: field.customEnd || "" });
+
+			startInput.addEventListener("change", () => {
+				field.customStart = startInput.value || undefined;
+				updateDQL();
+			});
+			endInput.addEventListener("change", () => {
+				field.customEnd = endInput.value || undefined;
+				updateDQL();
+			});
+
+			const updateCustomDateVisibility = () => {
+				if (field.mode === "custom") {
+					rangeDiv.style.display = "flex";
+				} else {
+					rangeDiv.style.display = "none";
+				}
+			};
+			updateCustomDateVisibility();
 		};
 
 		if (!this.result.filter.startDate) this.result.filter.startDate = { mode: "all" };
@@ -1341,6 +1418,7 @@ class TabOrColumnModal extends Modal {
 					.setValue(this.result.filter.dateFilterRelation || "or")
 					.onChange((val) => {
 						this.result.filter.dateFilterRelation = val as any;
+						updateDQL();
 					});
 			});
 
@@ -1351,6 +1429,7 @@ class TabOrColumnModal extends Modal {
 				text.setValue(this.result.filter.text || "")
 					.onChange((val) => {
 						this.result.filter.text = val;
+						updateDQL();
 					});
 			});
 
@@ -1360,28 +1439,25 @@ class TabOrColumnModal extends Modal {
 				text.setValue(this.result.filter.tag || "")
 					.onChange((val) => {
 						this.result.filter.tag = val;
+						updateDQL();
+					});
+			});
+
+		// Assignee (Person) Filter
+		new Setting(contentGui)
+			.setName("负责人 (Assignee)")
+			.addText((text) => {
+				text.setValue(this.result.filter.assignee || "")
+					.onChange((val) => {
+						this.result.filter.assignee = val;
+						updateDQL();
 					});
 			});
 
 
-		// ------------------ Advanced Tab Content ------------------
-		contentAdvanced.createEl("div", {
-			text: "直接编辑过滤任务的 DQL 查询语句。支持 status, priority, due, scheduled, start, path, tags 等字段。",
-			attr: { style: "font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;" }
-		});
-
-		const textarea = contentAdvanced.createEl("textarea", {
-			cls: "tasktodo-advanced-textarea",
-			value: this.result.query || ""
-		});
-		textarea.placeholder = 'e.g. status = "TODO" AND due <= date(today)';
-		textarea.addEventListener("input", () => {
-			this.result.query = textarea.value;
-		});
-
-
-		// Set initial active tab
+		// Set initial active tab & sync initial DQL string to textarea
 		setActiveTab(this.result.queryMode || "gui");
+		updateDQL();
 
 		// Save/Cancel Action Buttons
 		new Setting(contentEl)

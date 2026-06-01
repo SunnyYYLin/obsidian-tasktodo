@@ -262,6 +262,32 @@ describe("matchFilter", () => {
 		expect(matchFilter(tomorrowItem, filter)).toBe(false);
 	});
 
+	test("assignee filtering", () => {
+		const itemJohn = makeTestItem({ task: { status: "TODO", description: "Buy milk @john" } });
+		const itemMary = makeTestItem({ task: { status: "TODO", description: "Clean room @mary" } });
+		const itemNone = makeTestItem({ task: { status: "TODO", description: "Do homework" } });
+
+		expect(matchFilter(itemJohn, makeFilter({ assignee: "john" }))).toBe(true);
+		expect(matchFilter(itemJohn, makeFilter({ assignee: "@john" }))).toBe(true);
+		expect(matchFilter(itemMary, makeFilter({ assignee: "john" }))).toBe(false);
+		expect(matchFilter(itemNone, makeFilter({ assignee: "john" }))).toBe(false);
+	});
+
+	test("custom date range filtering", () => {
+		const itemStart = makeTestItem({ task: { status: "TODO", description: "task", dates: { start: "2026-06-05" } } });
+		const itemBefore = makeTestItem({ task: { status: "TODO", description: "task", dates: { start: "2026-06-02" } } });
+		const itemAfter = makeTestItem({ task: { status: "TODO", description: "task", dates: { start: "2026-06-12" } } });
+
+		// start range: [2026-06-04, 2026-06-10]
+		const filter = makeFilter({
+			startDate: { mode: "custom", customStart: "2026-06-04", customEnd: "2026-06-10" }
+		});
+
+		expect(matchFilter(itemStart, filter)).toBe(true);
+		expect(matchFilter(itemBefore, filter)).toBe(false);
+		expect(matchFilter(itemAfter, filter)).toBe(false);
+	});
+
 	describe("matchFilterWithDQL and preprocessDQLQuery", () => {
 		test("preprocessDQLQuery replaces tomorrow and next-week correctly", () => {
 			const query = 'status = "TODO" AND due = date(tomorrow) AND start = date(next-week)';

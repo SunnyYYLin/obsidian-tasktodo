@@ -64,6 +64,18 @@ export function matchFilter(item: TaskListItem, filter: FilterConfig): boolean {
 		}
 	}
 
+	// Assignee filter
+	if (filter.assignee && filter.assignee.trim() !== "") {
+		const assigneeQuery = filter.assignee.toLowerCase().trim();
+		const cleanQuery = assigneeQuery.startsWith("@") ? assigneeQuery.substring(1) : assigneeQuery;
+		const taskPeople = extractPeople(item.task.description).map((p: string) => 
+			p.toLowerCase().startsWith("@") ? p.toLowerCase().substring(1) : p.toLowerCase()
+		);
+		if (!taskPeople.some((p: string) => p.includes(cleanQuery))) {
+			return false;
+		}
+	}
+
 	// Date filters
 	const today = todayString();
 	const activeFields = [
@@ -153,6 +165,11 @@ function matchDateField(dateString: string | null, field: DateFilterField, today
 function extractTags(description: string): string[] {
 	const tagRegex = /(^|\s)#[^ !@#$%^&*(),.?":{}|<>]+/g;
 	return Array.from(description.matchAll(tagRegex)).map((match) => match[0].trim());
+}
+
+function extractPeople(description: string): string[] {
+	const peopleRegex = /(^|\s)@[^ !@#$%^&*(),.?":{}|<>]+/g;
+	return Array.from(description.matchAll(peopleRegex)).map((match) => match[0].trim());
 }
 
 export function preprocessDQLQuery(query: string): string {
