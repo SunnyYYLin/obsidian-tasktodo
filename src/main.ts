@@ -661,6 +661,7 @@ class TaskTodoSettingTab extends PluginSettingTab {
 				});
 				
 				colEl.addEventListener("dragstart", (e) => {
+					e.stopPropagation();
 					if (e.dataTransfer) {
 						e.dataTransfer.setData("text/plain", String(colIndex));
 						e.dataTransfer.effectAllowed = "move";

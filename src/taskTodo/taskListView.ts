@@ -1,4 +1,4 @@
-import { ItemView, Menu, Modal, Notice, setIcon, type App, type WorkspaceLeaf } from "obsidian";
+import { ItemView, Menu, Modal, Notice, setIcon, TFile, type App, type WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
 import { TASK_SYMBOLS, serializeTaskLine, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord, type EditTaskPatch, type CreateTaskInput } from "../taskLiteInterop";
 import { compareTaskTodoItems } from "./taskTodoSort";
@@ -203,8 +203,14 @@ export class TaskTodoTaskListView extends ItemView {
 		this.renderItemTitle(body, item);
 		this.renderItemMeta(body, item);
 
-		row.addEventListener("click", () => {
-			void this.editTask(item);
+		row.addEventListener("click", async () => {
+			const file = this.appRef.vault.getAbstractFileByPath(item.path);
+			if (file instanceof TFile) {
+				const leaf = this.appRef.workspace.getLeaf(false);
+				await leaf.openFile(file, {
+					eState: { line: item.lineNumber }
+				});
+			}
 		});
 
 		row.addEventListener("contextmenu", (event) => {
