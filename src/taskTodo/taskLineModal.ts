@@ -98,7 +98,9 @@ class TaskLineModal extends Modal {
 		}
 
 
-		this.addStatusSetting(this.contentEl);
+		if (!this.isCreateMode) {
+			this.addStatusSetting(this.contentEl);
+		}
 		this.addPrioritySetting(this.contentEl);
 		this.addDateSetting(`${TASK_SYMBOLS.start} ${t("modal.startDate")}`, "start");
 		this.addDateSetting(`${TASK_SYMBOLS.scheduled} ${t("modal.scheduledDate")}`, "scheduled");
