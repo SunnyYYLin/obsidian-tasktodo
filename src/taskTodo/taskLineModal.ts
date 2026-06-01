@@ -98,6 +98,7 @@ class TaskLineModal extends Modal {
 		}
 
 
+		this.addStatusSetting(this.contentEl);
 		this.addPrioritySetting(this.contentEl);
 		this.addDateSetting(`${TASK_SYMBOLS.start} ${t("modal.startDate")}`, "start");
 		this.addDateSetting(`${TASK_SYMBOLS.scheduled} ${t("modal.scheduledDate")}`, "scheduled");
@@ -253,6 +254,37 @@ class TaskLineModal extends Modal {
 				this.fields.recurrence = value;
 			});
 		});
+	}
+
+	private addStatusSetting(container: HTMLElement): void {
+		const settings = this.options.settings.statusSettings;
+		const statuses = [
+			...(settings?.coreStatuses || []),
+			...(settings?.customStatuses || []),
+		];
+
+		if (statuses.length === 0) return;
+
+		new Setting(container)
+			.setName(t("modal.status"))
+			.setClass("taskslite-modal-setting-compact")
+			.addDropdown((dropdown) => {
+				dropdown.selectEl.addClass("taskslite-modal-compact-control");
+				let hasCurrent = false;
+				for (const status of statuses) {
+					const label = `[${status.symbol}] ${status.name}`;
+					dropdown.addOption(status.symbol, label);
+					if (status.symbol === this.fields.statusSymbol) {
+						hasCurrent = true;
+					}
+				}
+				if (!hasCurrent && this.fields.statusSymbol) {
+					dropdown.addOption(this.fields.statusSymbol, `[${this.fields.statusSymbol}]`);
+				}
+				dropdown.setValue(this.fields.statusSymbol).onChange((value) => {
+					this.fields.statusSymbol = value;
+				});
+			});
 	}
 
 	private addPrioritySetting(container: HTMLElement): void {
