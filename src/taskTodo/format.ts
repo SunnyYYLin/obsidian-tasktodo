@@ -16,6 +16,7 @@ export const TASK_SYMBOLS = {
 	onCompletion: "🏁",
 	dependsOn: "⛔",
 	id: "🆔",
+	person: "👤",
 };
 
 export interface StatusConfiguration {
@@ -43,6 +44,7 @@ export interface TaskMetadata {
 	onCompletion: string | null;
 	id: string | null;
 	dependsOn: string | null;
+	person: string[];
 	blockLink: string | null;
 	tags: string[];
 }
@@ -93,6 +95,7 @@ export function parseTaskBody(body: string): TaskMetadata {
 		onCompletion: null,
 		id: null,
 		dependsOn: null,
+		person: [],
 		blockLink,
 		tags: [],
 	};
@@ -113,6 +116,7 @@ export function parseTaskBody(body: string): TaskMetadata {
 		matched = extractString(metadata, "onCompletion", TASK_SYMBOLS.onCompletion, "[a-zA-Z]+") || matched;
 		matched = extractString(metadata, "dependsOn", TASK_SYMBOLS.dependsOn, "[a-zA-Z0-9-_, ]+") || matched;
 		matched = extractString(metadata, "id", TASK_SYMBOLS.id, "[a-zA-Z0-9-_]+") || matched;
+		matched = extractPerson(metadata) || matched;
 	}
 	metadata.tags = extractTags(metadata.description);
 	return metadata;
@@ -123,6 +127,17 @@ export function parseTaskBody(body: string): TaskMetadata {
 		const match = target.description.match(regex);
 		if (!match) return false;
 		target.priority = match[1] ?? null;
+		target.description = target.description.replace(regex, "").trim();
+		return true;
+	}
+
+	function extractPerson(target: TaskMetadata): boolean {
+		const symbol = TASK_SYMBOLS.person;
+		const regex = new RegExp(` ?${escapeRegExp(symbol)}\\ufe0f? *([^👤✅🛫⏳📅➖❌🔁🏁⛔🆔\\^#]+)$`, "u");
+		const match = target.description.match(regex);
+		if (!match) return false;
+		const raw = (match[1] ?? "").trim();
+		target.person = raw ? raw.split("&").map((p) => p.trim()).filter(Boolean) : [];
 		target.description = target.description.replace(regex, "").trim();
 		return true;
 	}
@@ -145,6 +160,7 @@ export function serializeTaskBody(metadata: TaskMetadata): string {
 	if (metadata.onCompletion) parts.push(`${TASK_SYMBOLS.onCompletion} ${metadata.onCompletion}`);
 	if (metadata.dependsOn) parts.push(`${TASK_SYMBOLS.dependsOn} ${metadata.dependsOn}`);
 	if (metadata.id) parts.push(`${TASK_SYMBOLS.id} ${metadata.id}`);
+	if (metadata.person && metadata.person.length > 0) parts.push(`${TASK_SYMBOLS.person} ${metadata.person.join(" & ")}`);
 	if (metadata.blockLink) parts.push(metadata.blockLink);
 	return parts.filter(Boolean).join(" ");
 }
@@ -158,6 +174,7 @@ export function copyTaskMetadata(metadata: TaskMetadata): TaskMetadata {
 		onCompletion: metadata.onCompletion,
 		id: metadata.id,
 		dependsOn: metadata.dependsOn,
+		person: metadata.person ? [...metadata.person] : [],
 		blockLink: metadata.blockLink,
 		tags: [...metadata.tags],
 	};

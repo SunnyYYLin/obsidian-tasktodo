@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { serializeTaskLine, TASK_SYMBOLS, todayString } from "../src/taskLiteInterop";
 import type { TaskTodoTaskLine } from "../src/host";
+import { parseTaskBody } from "../src/taskTodo/format";
 
 const mockRegistry = {
 	getByType: (type: string) => {
@@ -21,6 +22,7 @@ function makeTask(overrides: Partial<TaskTodoTaskLine> = {}): TaskTodoTaskLine {
 		onCompletion: null,
 		id: null,
 		dependsOn: null,
+		person: [],
 		blockLink: null,
 		...overrides,
 	};
@@ -117,6 +119,7 @@ describe("serializeTaskLine", () => {
 			onCompletion: "archive",
 			id: "tid1",
 			dependsOn: "tid0",
+			person: ["John", "Mary"],
 			blockLink: "^abc",
 		};
 		const line = serializeTaskLine(task, mockRegistry);
@@ -132,6 +135,7 @@ describe("serializeTaskLine", () => {
 		expect(line).toContain(`${TASK_SYMBOLS.onCompletion} archive`);
 		expect(line).toContain(`${TASK_SYMBOLS.dependsOn} tid0`);
 		expect(line).toContain(`${TASK_SYMBOLS.id} tid1`);
+		expect(line).toContain(`${TASK_SYMBOLS.person} John & Mary`);
 		expect(line).toEndWith("^abc");
 	});
 
@@ -154,5 +158,21 @@ describe("todayString", () => {
 		};
 		const result = todayString();
 		expect(result).toBe("2024-06-15");
+	});
+});
+
+describe("parseTaskBody from format.ts", () => {
+	test("解析单人/多人 assignee", () => {
+		const meta1 = parseTaskBody("Buy milk 👤 John");
+		expect(meta1.person).toEqual(["John"]);
+		expect(meta1.description).toBe("Buy milk");
+
+		const meta2 = parseTaskBody("Buy milk 👤 John & Mary");
+		expect(meta2.person).toEqual(["John", "Mary"]);
+		expect(meta2.description).toBe("Buy milk");
+
+		const metaNone = parseTaskBody("Buy milk");
+		expect(metaNone.person).toEqual([]);
+		expect(metaNone.description).toBe("Buy milk");
 	});
 });

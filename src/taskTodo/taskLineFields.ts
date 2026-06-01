@@ -65,6 +65,7 @@ export function taskLineFromFields(fields: TaskLineFields, registry: StatusRegis
 		onCompletion: emptyToNull(fields.onCompletion),
 		id: emptyToNull(fields.id),
 		dependsOn: emptyToNull(fields.dependsOn),
+		person: templateTask.metadata.person || [],
 		blockLink: emptyToNull(fields.blockLink),
 		tags: [],
 	};
@@ -96,6 +97,7 @@ function normalizeTaskLine(line: string, registry: StatusRegistry): TaskLine {
 			onCompletion: null,
 			id: null,
 			dependsOn: null,
+			person: [],
 			blockLink: null,
 			tags: [],
 		},

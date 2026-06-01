@@ -18,6 +18,7 @@ export interface TaskTodoTaskLine {
 	onCompletion: string | null;
 	dependsOn: string | null;
 	id: string | null;
+	person: string[];
 	blockLink: string | null;
 }
 
@@ -43,6 +44,7 @@ export interface CreateTaskInput {
 	onCompletion?: string | null;
 	id?: string | null;
 	dependsOn?: string | null;
+	person?: string[];
 	path?: string;
 	parentLineNumber?: number;
 }
@@ -60,6 +62,7 @@ export interface EditTaskPatch {
 	onCompletion?: string | null;
 	id?: string | null;
 	dependsOn?: string | null;
+	person?: string[];
 }
 
 export interface TaskTodoCoreApi {

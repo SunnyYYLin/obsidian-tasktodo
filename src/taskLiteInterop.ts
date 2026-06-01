@@ -20,6 +20,7 @@ export const TASK_SYMBOLS = {
 	onCompletion: "🏁",
 	dependsOn: "⛔",
 	id: "🆔",
+	person: "👤",
 } as const;
 
 export function serializeTaskLine(task: TaskTodoTaskLine, registry: { getByType(type: string): { symbol: string } }): string {
@@ -36,6 +37,7 @@ export function serializeTaskLine(task: TaskTodoTaskLine, registry: { getByType(
 	if (task.onCompletion) parts.push(`${TASK_SYMBOLS.onCompletion} ${task.onCompletion}`);
 	if (task.dependsOn) parts.push(`${TASK_SYMBOLS.dependsOn} ${task.dependsOn}`);
 	if (task.id) parts.push(`${TASK_SYMBOLS.id} ${task.id}`);
+	if (task.person && task.person.length > 0) parts.push(`${TASK_SYMBOLS.person} ${task.person.join(" & ")}`);
 	if (task.blockLink) parts.push(task.blockLink);
 	return `- [${symbol}] ${parts.filter(Boolean).join(" ")}`.trimEnd();
 }
