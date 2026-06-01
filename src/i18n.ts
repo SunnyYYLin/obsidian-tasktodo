@@ -101,6 +101,11 @@ const messages = {
 		"settings.add": "Add",
 		"settings.edit": "Edit",
 		"settings.delete": "Delete",
+		"settings.import": "Import",
+		"settings.importData.name": "Import Configuration",
+		"settings.importData.desc": "Import tabs and columns configuration from a data.json file.",
+		"settings.importData.success": "Configuration imported successfully.",
+		"settings.importData.error": "Failed to import configuration: invalid file format.",
 	},
 	zh: {
 		"common.cancel": "取消",
@@ -204,6 +209,11 @@ const messages = {
 		"settings.add": "添加",
 		"settings.edit": "编辑",
 		"settings.delete": "删除",
+		"settings.import": "导入",
+		"settings.importData.name": "导入配置",
+		"settings.importData.desc": "从 data.json 文件导入标签页和栏目配置。",
+		"settings.importData.success": "配置导入成功。",
+		"settings.importData.error": "导入配置失败：文件格式无效。",
 	},
 } as const;
 

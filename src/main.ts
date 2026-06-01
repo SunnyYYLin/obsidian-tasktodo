@@ -98,44 +98,37 @@ export default class TaskTodoPlugin extends Plugin {
 			{
 				id: "overdue_" + Math.random(),
 				title: t("taskTodo.group.earlier") || "早前",
-				queryMode: "gui",
-				query: getEnforcedColumnDQL("in-plan", "overdue"),
+				queryMode: "advanced",
+				query: 'scheduled < date(today) OR due < date(today)',
 				filter: getEnforcedColumnFilter("overdue")
 			},
 			{
 				id: "today_" + Math.random(),
 				title: t("taskTodo.group.today") || "今天",
-				queryMode: "gui",
-				query: getEnforcedColumnDQL("in-plan", "today"),
+				queryMode: "advanced",
+				query: 'scheduled = date(today) OR due = date(today)',
 				filter: getEnforcedColumnFilter("today")
 			},
 			{
 				id: "tomorrow_" + Math.random(),
 				title: t("taskTodo.group.tomorrow") || "明天",
-				queryMode: "gui",
-				query: getEnforcedColumnDQL("in-plan", "tomorrow"),
+				queryMode: "advanced",
+				query: 'scheduled = date(tomorrow) OR due = date(tomorrow)',
 				filter: getEnforcedColumnFilter("tomorrow")
 			},
 			{
 				id: "week_" + Math.random(),
 				title: t("taskTodo.group.next7Days") || "本周",
-				queryMode: "gui",
-				query: getEnforcedColumnDQL("in-plan", "week"),
+				queryMode: "advanced",
+				query: '(scheduled > date(tomorrow) AND scheduled <= date(next-week)) OR (due > date(tomorrow) AND due <= date(next-week))',
 				filter: getEnforcedColumnFilter("week")
 			},
 			{
 				id: "later_" + Math.random(),
 				title: t("taskTodo.group.later") || "以后",
-				queryMode: "gui",
-				query: getEnforcedColumnDQL("in-plan", "later"),
+				queryMode: "advanced",
+				query: 'scheduled > date(next-week) OR due > date(next-week)',
 				filter: getEnforcedColumnFilter("later")
-			},
-			{
-				id: "no-date_" + Math.random(),
-				title: t("taskTodo.group.noDate") || "无日期",
-				queryMode: "gui",
-				query: getEnforcedColumnDQL("in-plan", "no-date"),
-				filter: getEnforcedColumnFilter("no-date")
 			}
 		];
 
@@ -143,16 +136,23 @@ export default class TaskTodoPlugin extends Plugin {
 			{
 				id: "overdue_" + Math.random(),
 				title: t("taskTodo.group.overdue") || "已过期",
-				queryMode: "gui",
-				query: getEnforcedColumnDQL("today", "overdue"),
+				queryMode: "advanced",
+				query: 'status != "CANCELLED" AND status != "DONE" AND (scheduled < date(today) OR due < date(today))',
 				filter: getEnforcedColumnFilter("overdue")
 			},
 			{
 				id: "today_" + Math.random(),
 				title: t("taskTodo.group.today") || "今天",
-				queryMode: "gui",
-				query: getEnforcedColumnDQL("today", "today"),
+				queryMode: "advanced",
+				query: '(start <= date(today) AND (scheduled > date(today) OR due > date(today))) OR scheduled = date(today) OR due = date(today)',
 				filter: getEnforcedColumnFilter("today")
+			},
+			{
+				id: "no-date_" + Math.random(),
+				title: t("taskTodo.group.noDate") || "无日期",
+				queryMode: "advanced",
+				query: 'status != "CANCELLED" AND status != "DONE" AND parentLine = null AND scheduled = null AND due = null',
+				filter: getEnforcedColumnFilter("no-date")
 			}
 		];
 
@@ -161,16 +161,16 @@ export default class TaskTodoPlugin extends Plugin {
 				{
 					id: "in-plan",
 					title: t("taskTodo.tab.inPlan"),
-					queryMode: "gui",
-					query: getEnforcedTabDQL("in-plan"),
+					queryMode: "advanced",
+					query: 'due != null OR scheduled != null OR start != null',
 					filter: getEnforcedTabFilter("in-plan"),
 					columns: createDefaultInPlanColumns()
 				},
 				{
 					id: "today",
 					title: t("taskTodo.tab.today"),
-					queryMode: "gui",
-					query: getEnforcedTabDQL("today"),
+					queryMode: "advanced",
+					query: 'status != "DONE" AND status != "CANCELLED" AND (start <= date(today) OR scheduled <= date(today) OR due <= date(today))',
 					filter: getEnforcedTabFilter("today"),
 					columns: createDefaultTodayColumns()
 				}
@@ -246,6 +246,44 @@ class TaskTodoSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		containerEl.createEl("h2", { text: t("settings.title") });
+
+		// 导入配置按钮
+		new Setting(containerEl)
+			.setName(t("settings.importData.name"))
+			.setDesc(t("settings.importData.desc"))
+			.addButton((button) =>
+				button
+					.setButtonText(t("settings.import"))
+					.setCta()
+					.onClick(() => {
+						const input = document.createElement("input");
+						input.type = "file";
+						input.accept = ".json";
+						input.onchange = async () => {
+							const file = input.files?.[0];
+							if (!file) return;
+							try {
+								const text = await file.text();
+								const data = JSON.parse(text);
+								if (Array.isArray(data.tabs)) {
+									this.plugin.settings.tabs = data.tabs;
+								}
+								if (Array.isArray(data.sortOrder)) {
+									this.plugin.settings.sortOrder = data.sortOrder;
+								}
+								if (Array.isArray(data.columns)) {
+									this.plugin.settings.columns = data.columns;
+								}
+								await this.plugin.saveSettings();
+								new Notice(t("settings.importData.success"));
+								this.display();
+							} catch {
+								new Notice(t("settings.importData.error"));
+							}
+						};
+						input.click();
+					})
+			);
 
 		new Setting(containerEl)
 			.setName(t("settings.sortOrder.name"))
@@ -734,10 +772,10 @@ export const getColumnKey = (colId: string): string | null => {
 
 export const getEnforcedTabDQL = (tabId: string): string => {
 	if (tabId === "in-plan") {
-		return 'status != "CANCELLED"';
+		return 'due != null OR scheduled != null OR start != null';
 	}
 	if (tabId === "today") {
-		return 'status != "DONE" AND status != "CANCELLED" AND (due <= date(today) OR scheduled <= date(today) OR start <= date(today))';
+		return 'status != "DONE" AND status != "CANCELLED" AND (start <= date(today) OR scheduled <= date(today) OR due <= date(today))';
 	}
 	return "";
 };
@@ -745,25 +783,29 @@ export const getEnforcedTabDQL = (tabId: string): string => {
 export const getEnforcedColumnDQL = (tabId: string, colKey: string): string => {
 	if (colKey === "overdue") {
 		if (tabId === "today") {
-			return 'status != "DONE" AND status != "CANCELLED" AND (due < date(today) OR scheduled < date(today) OR start < date(today))';
+			return 'status != "CANCELLED" AND status != "DONE" AND (scheduled < date(today) OR due < date(today))';
 		} else {
-			return 'status != "CANCELLED" AND (due < date(today) OR scheduled < date(today) OR start < date(today))';
+			return 'scheduled < date(today) OR due < date(today)';
 		}
 	}
 	if (colKey === "today") {
-		return 'status != "DONE" AND status != "CANCELLED" AND (due = date(today) OR scheduled = date(today) OR start = date(today))';
+		if (tabId === "today") {
+			return '(start <= date(today) AND (scheduled > date(today) OR due > date(today))) OR scheduled = date(today) OR due = date(today)';
+		} else {
+			return 'scheduled = date(today) OR due = date(today)';
+		}
 	}
 	if (colKey === "tomorrow") {
-		return 'status != "DONE" AND status != "CANCELLED" AND (due = date(tomorrow) OR scheduled = date(tomorrow) OR start = date(tomorrow))';
+		return 'scheduled = date(tomorrow) OR due = date(tomorrow)';
 	}
 	if (colKey === "week") {
-		return 'status != "DONE" AND status != "CANCELLED" AND ((due >= date(today) AND due <= date(next-week)) OR (scheduled >= date(today) AND scheduled <= date(next-week)) OR (start >= date(today) AND start <= date(next-week)))';
+		return '(scheduled > date(tomorrow) AND scheduled <= date(next-week)) OR (due > date(tomorrow) AND due <= date(next-week))';
 	}
 	if (colKey === "later") {
-		return 'status != "DONE" AND status != "CANCELLED" AND (due > date(next-week) OR scheduled > date(next-week) OR start > date(next-week))';
+		return 'scheduled > date(next-week) OR due > date(next-week)';
 	}
 	if (colKey === "no-date") {
-		return 'status != "DONE" AND status != "CANCELLED" AND due = null AND scheduled = null AND start = null';
+		return 'status != "CANCELLED" AND status != "DONE" AND parentLine = null AND scheduled = null AND due = null';
 	}
 	return "";
 };
