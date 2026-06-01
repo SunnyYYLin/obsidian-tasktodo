@@ -22,21 +22,22 @@ export const TASK_SYMBOLS = {
 	id: "🆔",
 } as const;
 
-export function serializeTaskLine(task: TaskTodoTaskLine): string {
-	const parts = [task.metadata.description.trim()];
-	if (task.metadata.priority) parts.push(task.metadata.priority);
-	addDate(parts, TASK_SYMBOLS.start, task.metadata.dates.start);
-	addDate(parts, TASK_SYMBOLS.created, task.metadata.dates.created);
-	addDate(parts, TASK_SYMBOLS.scheduled, task.metadata.dates.scheduled);
-	addDate(parts, TASK_SYMBOLS.due, task.metadata.dates.due);
-	addDate(parts, TASK_SYMBOLS.done, task.metadata.dates.done);
-	addDate(parts, TASK_SYMBOLS.cancelled, task.metadata.dates.cancelled);
-	if (task.metadata.recurrence) parts.push(`${TASK_SYMBOLS.recurrence} ${task.metadata.recurrence}`);
-	if (task.metadata.onCompletion) parts.push(`${TASK_SYMBOLS.onCompletion} ${task.metadata.onCompletion}`);
-	if (task.metadata.dependsOn) parts.push(`${TASK_SYMBOLS.dependsOn} ${task.metadata.dependsOn}`);
-	if (task.metadata.id) parts.push(`${TASK_SYMBOLS.id} ${task.metadata.id}`);
-	if (task.metadata.blockLink) parts.push(task.metadata.blockLink);
-	return `- [${task.status.symbol}] ${parts.filter(Boolean).join(" ")}`.trimEnd();
+export function serializeTaskLine(task: TaskTodoTaskLine, registry: { getByType(type: string): { symbol: string } }): string {
+	const symbol = registry.getByType(task.status).symbol || " ";
+	const parts = [task.description.trim()];
+	if (task.priority) parts.push(task.priority);
+	addDate(parts, TASK_SYMBOLS.start, task.dates.start);
+	addDate(parts, TASK_SYMBOLS.created, task.dates.created);
+	addDate(parts, TASK_SYMBOLS.scheduled, task.dates.scheduled);
+	addDate(parts, TASK_SYMBOLS.due, task.dates.due);
+	addDate(parts, TASK_SYMBOLS.done, task.dates.done);
+	addDate(parts, TASK_SYMBOLS.cancelled, task.dates.cancelled);
+	if (task.recurrence) parts.push(`${TASK_SYMBOLS.recurrence} ${task.recurrence}`);
+	if (task.onCompletion) parts.push(`${TASK_SYMBOLS.onCompletion} ${task.onCompletion}`);
+	if (task.dependsOn) parts.push(`${TASK_SYMBOLS.dependsOn} ${task.dependsOn}`);
+	if (task.id) parts.push(`${TASK_SYMBOLS.id} ${task.id}`);
+	if (task.blockLink) parts.push(task.blockLink);
+	return `- [${symbol}] ${parts.filter(Boolean).join(" ")}`.trimEnd();
 }
 
 export function todayString(): string {

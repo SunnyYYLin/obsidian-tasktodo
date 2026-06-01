@@ -3,27 +3,22 @@ import type { App } from "obsidian";
 export const TASKLITE_PLUGIN_ID = "taskslite";
 
 export interface TaskTodoTaskLine {
-	status: {
-		symbol: string;
-		type: string;
+	status: string;
+	description: string;
+	priority: string | null;
+	dates: {
+		start: string | null;
+		created: string | null;
+		scheduled: string | null;
+		due: string | null;
+		done: string | null;
+		cancelled: string | null;
 	};
-	metadata: {
-		description: string;
-		priority: string | null;
-		dates: {
-			start: string | null;
-			created: string | null;
-			scheduled: string | null;
-			due: string | null;
-			done: string | null;
-			cancelled: string | null;
-		};
-		recurrence: string | null;
-		onCompletion: string | null;
-		id: string | null;
-		dependsOn: string | null;
-		blockLink?: string | null;
-	};
+	recurrence: string | null;
+	onCompletion: string | null;
+	dependsOn: string | null;
+	id: string | null;
+	blockLink: string | null;
 }
 
 export interface TaskTodoTaskRecord {
@@ -56,7 +51,6 @@ export interface CreateTaskInput {
 export interface EditTaskPatch {
 	description?: string;
 	priority?: string | null;
-	statusSymbol?: string;
 	dates?: {
 		start?: string | null;
 		scheduled?: string | null;
@@ -74,10 +68,7 @@ export interface TaskTodoCoreApi {
 		includeCancelled?: boolean;
 		includeChildren?: boolean;
 	}): Promise<TaskTodoTaskRecord[]>;
-	finishTask(path: string, lineNumber: number): Promise<boolean>;
-	unfinishTask(path: string, lineNumber: number): Promise<boolean>;
-	cancelTask(path: string, lineNumber: number): Promise<boolean>;
-	uncancelTask(path: string, lineNumber: number): Promise<boolean>;
+	updateTaskStatus(path: string, lineNumber: number, statusSymbol: string): Promise<boolean>;
 	createTask(input: CreateTaskInput): Promise<void>;
 	deleteTask(path: string, lineNumber: number): Promise<boolean>;
 	editTask(path: string, lineNumber: number, patch: EditTaskPatch): Promise<boolean>;
@@ -87,7 +78,8 @@ export interface TaskTodoCoreApi {
 export interface TaskTodoHost {
 	api: TaskTodoCoreApi;
 	statusRegistry: {
-		get(symbol: string): {symbol: string; name: string; type: string};
+		get(symbol: string): {symbol: string; name: string; type: string; nextStatusSymbol: string};
+		getByType(type: string): {symbol: string; name: string; type: string; nextStatusSymbol: string};
 	};
 	settings: {
 		statusSettings: unknown;

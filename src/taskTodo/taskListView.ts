@@ -1,9 +1,9 @@
 import { ItemView, Menu, Modal, Notice, setIcon, type App, type WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
-import { TASK_SYMBOLS, serializeTaskLine, todayString, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord, type EditTaskPatch, type CreateTaskInput } from "../taskLiteInterop";
+import { TASK_SYMBOLS, serializeTaskLine, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord, type EditTaskPatch, type CreateTaskInput } from "../taskLiteInterop";
 import { compareTaskTodoItems } from "./taskTodoSort";
 import type TaskTodoPlugin from "../main";
-import type { FilterConfig, TabConfig, ColumnConfig, DateFilterField } from "../main";
+import type { FilterConfig, ColumnConfig } from "../main";
 import { matchFilter, type TaskListItem } from "./taskTodoFilter";
 import { openTaskLineModal as openLocalTaskLineModal, openTaskLineModalWithTarget, type TaskLineModalResult, type TaskLiteSettings } from "./taskLineModal";
 import { fieldsFromTaskLine, type StatusRegistry } from "./taskLineFields";
@@ -182,18 +182,19 @@ export class TaskTodoTaskListView extends ItemView {
 	private renderTaskItem(container: HTMLElement, item: TaskListItem, filter: FilterConfig): void {
 		const wrapper = container.createDiv({cls: "taskslite-list-item-wrapper"});
 		const row = wrapper.createDiv({cls: "taskslite-list-item"});
-		row.dataset.taskStatusType = item.task.status.type;
-		row.dataset.taskStatusSymbol = item.task.status.symbol;
+		row.dataset.taskStatusType = item.task.status;
+		row.dataset.taskStatusSymbol = this.host.statusRegistry.getByType(item.task.status).symbol;
 		const checkbox = row.createEl("button", {cls: "taskslite-list-checkbox", attr: {"aria-label": t("task.action.complete")}});
 		const checkboxIcon = checkbox.createSpan({cls: "taskslite-list-checkbox-icon"});
-		applyTaskStatusIcon(checkboxIcon, item.task.status.type);
+		applyTaskStatusIcon(checkboxIcon, item.task.status);
 		checkbox.addEventListener("click", (event) => {
 			event.preventDefault();
 			event.stopPropagation();
 			checkbox.setAttr("disabled", "true");
 			void (async () => {
-				if (item.task.status.type === "DONE") await this.host.api.unfinishTask(item.path, item.lineNumber);
-				else await this.host.api.finishTask(item.path, item.lineNumber);
+				const currentStatus = this.host.statusRegistry.getByType(item.task.status);
+				const nextSymbol = currentStatus.nextStatusSymbol || (item.task.status === "DONE" ? " " : "x");
+				await this.host.api.updateTaskStatus(item.path, item.lineNumber, nextSymbol);
 				await this.render();
 			})();
 		});
@@ -233,9 +234,12 @@ export class TaskTodoTaskListView extends ItemView {
 			});
 
 			// 3. 进行中 (In progress)
-			const isInProgress = item.task.status.type === "IN_PROGRESS";
+			const isInProgress = item.task.status === "IN_PROGRESS";
 			menu.addItem((menuItem) => {
-				const statusSettings = this.host.settings.statusSettings as any;
+				const statusSettings = this.host.settings.statusSettings as {
+					coreStatuses?: Array<{ symbol: string; type: string }>;
+					customStatuses?: Array<{ symbol: string; type: string }>;
+				} | undefined;
 				const allStatuses = [
 					...(statusSettings?.coreStatuses || []),
 					...(statusSettings?.customStatuses || [])
@@ -247,23 +251,20 @@ export class TaskTodoTaskListView extends ItemView {
 					.setChecked(isInProgress)
 					.onClick(async () => {
 						const newSymbol = isInProgress ? " " : inProgressStatus.symbol;
-						await this.host.api.editTask(item.path, item.lineNumber, { statusSymbol: newSymbol });
+						await this.host.api.updateTaskStatus(item.path, item.lineNumber, newSymbol);
 						await this.render();
 					});
 			});
 
 			// 4. 取消 (Cancel)
-			const isCancelled = item.task.status.type === "CANCELLED";
+			const isCancelled = item.task.status === "CANCELLED";
 			menu.addItem((menuItem) => {
 				menuItem
 					.setTitle(isCancelled ? t("task.action.uncancel") : t("task.action.cancel"))
 					.setIcon(isCancelled ? "rotate-ccw" : "circle-slash")
 					.onClick(async () => {
-						if (isCancelled) {
-							await this.host.api.uncancelTask(item.path, item.lineNumber);
-						} else {
-							await this.host.api.cancelTask(item.path, item.lineNumber);
-						}
+						const targetSymbol = isCancelled ? " " : "-";
+						await this.host.api.updateTaskStatus(item.path, item.lineNumber, targetSymbol);
 						await this.render();
 					});
 			});
@@ -277,7 +278,7 @@ export class TaskTodoTaskListView extends ItemView {
 						new ConfirmModal(
 							this.appRef,
 							t("task.action.deleteConfirmTitle"),
-							t("task.action.deleteConfirmMessage").replace("{description}", item.task.metadata.description),
+							t("task.action.deleteConfirmMessage").replace("{description}", item.task.description),
 							async () => {
 								await this.host.api.deleteTask(item.path, item.lineNumber);
 								await this.render();
@@ -309,15 +310,15 @@ export class TaskTodoTaskListView extends ItemView {
 				this.toggleTaskExpanded(item);
 			});
 		}
-		titleRow.createDiv({text: item.task.metadata.description, cls: "taskslite-list-item-title"});
+		titleRow.createDiv({text: item.task.description, cls: "taskslite-list-item-title"});
 	}
 
 	private renderItemMeta(container: HTMLElement, item: TaskListItem): void {
 		const meta = container.createDiv({cls: "taskslite-list-item-meta"});
 		const context = meta.createDiv({cls: "taskslite-list-item-context"});
 		context.createSpan({text: item.basename});
-		if (item.parent) context.createSpan({text: item.parent.task.metadata.description, cls: "taskslite-list-parent"});
-		if (item.task.metadata.priority) context.createSpan({text: item.task.metadata.priority, cls: "taskslite-list-priority"});
+		if (item.parent) context.createSpan({text: item.parent.task.description, cls: "taskslite-list-parent"});
+		if (item.task.priority) context.createSpan({text: item.task.priority, cls: "taskslite-list-priority"});
 
 		const dates = meta.createDiv({cls: "taskslite-list-item-dates"});
 		for (const datePart of taskDateParts(item.task)) {
@@ -338,9 +339,9 @@ export class TaskTodoTaskListView extends ItemView {
 	private renderChildList(container: HTMLElement, item: TaskListItem, filter: FilterConfig): void {
 		let children = item.children.filter((child) => isVisibleTask(child));
 		if (filter.completed === "uncompleted") {
-			children = children.filter((child) => child.task.status.type !== "DONE");
+			children = children.filter((child) => child.task.status !== "DONE");
 		} else if (filter.completed === "completed") {
-			children = children.filter((child) => child.task.status.type === "DONE");
+			children = children.filter((child) => child.task.status === "DONE");
 		}
 		if (children.length === 0) return;
 
@@ -351,8 +352,9 @@ export class TaskTodoTaskListView extends ItemView {
 	}
 
 	private async editTask(item: TaskListItem): Promise<void> {
-		const updatedLine = await openTaskLineModal(this.host, this.appRef, serializeTaskLine(item.task), t("taskTodo.createTask"));
-		if (!updatedLine || updatedLine === serializeTaskLine(item.task)) return;
+		const currentLine = serializeTaskLine(item.task, this.host.statusRegistry);
+		const updatedLine = await openTaskLineModal(this.host, this.appRef, currentLine, t("taskTodo.createTask"));
+		if (!updatedLine || updatedLine === currentLine) return;
 
 		const fields = fieldsFromTaskLine(updatedLine, this.host.statusRegistry as unknown as StatusRegistry);
 		const patch: EditTaskPatch = {
@@ -371,20 +373,9 @@ export class TaskTodoTaskListView extends ItemView {
 
 		await this.host.api.editTask(item.path, item.lineNumber, patch);
 
-		const newStatus = this.host.statusRegistry.get(fields.statusSymbol);
-		const oldStatusType = item.task.status.type;
-		const newStatusType = newStatus.type;
-
-		if (newStatusType !== oldStatusType) {
-			if (newStatusType === "DONE") {
-				await this.host.api.finishTask(item.path, item.lineNumber);
-			} else if (newStatusType === "CANCELLED") {
-				await this.host.api.cancelTask(item.path, item.lineNumber);
-			} else if (oldStatusType === "DONE") {
-				await this.host.api.unfinishTask(item.path, item.lineNumber);
-			} else if (oldStatusType === "CANCELLED") {
-				await this.host.api.uncancelTask(item.path, item.lineNumber);
-			}
+		const currentSymbol = this.host.statusRegistry.getByType(item.task.status).symbol;
+		if (fields.statusSymbol !== currentSymbol) {
+			await this.host.api.updateTaskStatus(item.path, item.lineNumber, fields.statusSymbol);
 		}
 
 		await this.render();
@@ -569,28 +560,28 @@ function isVisibleTask(_item: TaskListItem): boolean {
 }
 
 function taskListDate(task: TaskTodoTaskLine): Pick<TaskListItem, "date" | "dateType"> {
-	if (task.metadata.dates.due) return {date: task.metadata.dates.due, dateType: "due"};
-	if (task.metadata.dates.scheduled) return {date: task.metadata.dates.scheduled, dateType: "scheduled"};
-	if (task.metadata.dates.start) return {date: task.metadata.dates.start, dateType: "start"};
+	if (task.dates.due) return {date: task.dates.due, dateType: "due"};
+	if (task.dates.scheduled) return {date: task.dates.scheduled, dateType: "scheduled"};
+	if (task.dates.start) return {date: task.dates.start, dateType: "start"};
 	return {date: null, dateType: null};
 }
 
 function taskDateParts(task: TaskTodoTaskLine): string[] {
 	const parts: string[] = [];
-	if (task.metadata.dates.scheduled) parts.push(`${TASK_SYMBOLS.scheduled} ${task.metadata.dates.scheduled}`);
-	if (task.metadata.dates.due) parts.push(`${TASK_SYMBOLS.due} ${task.metadata.dates.due}`);
-	if (task.metadata.dates.start) parts.push(`${TASK_SYMBOLS.start} ${task.metadata.dates.start}`);
-	if (task.metadata.dates.done) parts.push(`${TASK_SYMBOLS.done} ${task.metadata.dates.done}`);
+	if (task.dates.scheduled) parts.push(`${TASK_SYMBOLS.scheduled} ${task.dates.scheduled}`);
+	if (task.dates.due) parts.push(`${TASK_SYMBOLS.due} ${task.dates.due}`);
+	if (task.dates.start) parts.push(`${TASK_SYMBOLS.start} ${task.dates.start}`);
+	if (task.dates.done) parts.push(`${TASK_SYMBOLS.done} ${task.dates.done}`);
 	return parts;
 }
 
 function otherMetadataParts(task: TaskTodoTaskLine): string[] {
 	const parts: string[] = [];
-	if (task.metadata.recurrence) parts.push(`${TASK_SYMBOLS.recurrence} ${task.metadata.recurrence}`);
-	if (task.metadata.id) parts.push(`${TASK_SYMBOLS.id} ${task.metadata.id}`);
-	if (task.metadata.onCompletion) parts.push(`${TASK_SYMBOLS.onCompletion} ${task.metadata.onCompletion}`);
-	if (task.metadata.dependsOn) parts.push(`${TASK_SYMBOLS.dependsOn} ${task.metadata.dependsOn}`);
-	if (task.metadata.blockLink) parts.push(task.metadata.blockLink);
+	if (task.recurrence) parts.push(`${TASK_SYMBOLS.recurrence} ${task.recurrence}`);
+	if (task.id) parts.push(`${TASK_SYMBOLS.id} ${task.id}`);
+	if (task.onCompletion) parts.push(`${TASK_SYMBOLS.onCompletion} ${task.onCompletion}`);
+	if (task.dependsOn) parts.push(`${TASK_SYMBOLS.dependsOn} ${task.dependsOn}`);
+	if (task.blockLink) parts.push(task.blockLink);
 	return parts;
 }
 

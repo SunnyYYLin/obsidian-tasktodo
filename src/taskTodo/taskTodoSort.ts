@@ -40,7 +40,7 @@ export function compareTaskTodoItems(
 }
 
 function priorityRank(task: TaskTodoTaskLine): number {
-	const priority = task.metadata.priority;
+	const priority = task.priority;
 	if (priority === TASK_SYMBOLS.priority.highest) return 0;
 	if (priority === TASK_SYMBOLS.priority.high) return 1;
 	if (priority === TASK_SYMBOLS.priority.medium) return 2;
@@ -54,14 +54,14 @@ function compareImportance(left: TaskTodoTaskLine, right: TaskTodoTaskLine): num
 }
 
 function compareCancelled(left: TaskTodoTaskLine, right: TaskTodoTaskLine): number {
-	const leftRank = left.status.type === "CANCELLED" ? 1 : 0;
-	const rightRank = right.status.type === "CANCELLED" ? 1 : 0;
+	const leftRank = left.status === "CANCELLED" ? 1 : 0;
+	const rightRank = right.status === "CANCELLED" ? 1 : 0;
 	return leftRank - rightRank;
 }
 
 export function getTaskDateValue(task: TaskTodoTaskLine): string | null {
-	const due = task.metadata.dates.due;
-	const scheduled = task.metadata.dates.scheduled;
+	const due = task.dates.due;
+	const scheduled = task.dates.scheduled;
 	if (due && scheduled) return due < scheduled ? due : scheduled;
 	return due || scheduled || null;
 }
@@ -87,11 +87,11 @@ function getDateDiffInDays(dateStr: string | null, startStr: string | null): num
 }
 
 export function getLifeLength(task: TaskTodoTaskLine): number | null {
-	const start = task.metadata.dates.start;
+	const start = task.dates.start;
 	if (!start) return null;
 
-	const due = task.metadata.dates.due;
-	const scheduled = task.metadata.dates.scheduled;
+	const due = task.dates.due;
+	const scheduled = task.dates.scheduled;
 
 	const dueDiff = getDateDiffInDays(due, start);
 	const schedDiff = getDateDiffInDays(scheduled, start);

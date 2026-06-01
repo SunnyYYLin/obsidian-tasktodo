@@ -21,23 +21,23 @@ export function shiftDate(value: string, amount: number): string {
 }
 
 export function matchFilter(item: TaskListItem, filter: FilterConfig): boolean {
-	if (filter.completed === "completed" && item.task.status.type !== "DONE") {
+	if (filter.completed === "completed" && item.task.status !== "DONE") {
 		return false;
 	}
-	if (filter.completed === "uncompleted" && item.task.status.type === "DONE") {
+	if (filter.completed === "uncompleted" && item.task.status === "DONE") {
 		return false;
 	}
 
-	if (filter.cancelled === "cancelled" && item.task.status.type !== "CANCELLED") {
+	if (filter.cancelled === "cancelled" && item.task.status !== "CANCELLED") {
 		return false;
 	}
-	if (filter.cancelled === "uncancelled" && item.task.status.type === "CANCELLED") {
+	if (filter.cancelled === "uncancelled" && item.task.status === "CANCELLED") {
 		return false;
 	}
 
 	// Priority filter
 	if (filter.priority && filter.priority.length > 0) {
-		const key = getPriorityKey(item.task.metadata.priority);
+		const key = getPriorityKey(item.task.priority);
 		if (!filter.priority.includes(key)) {
 			return false;
 		}
@@ -46,7 +46,7 @@ export function matchFilter(item: TaskListItem, filter: FilterConfig): boolean {
 	// Text query filter
 	if (filter.text && filter.text.trim() !== "") {
 		const query = filter.text.toLowerCase().trim();
-		const desc = item.task.metadata.description.toLowerCase();
+		const desc = item.task.description.toLowerCase();
 		if (!desc.includes(query)) {
 			return false;
 		}
@@ -56,7 +56,7 @@ export function matchFilter(item: TaskListItem, filter: FilterConfig): boolean {
 	if (filter.tag && filter.tag.trim() !== "") {
 		const tagQuery = filter.tag.toLowerCase().trim();
 		const cleanQuery = tagQuery.startsWith("#") ? tagQuery.substring(1) : tagQuery;
-		const taskTags = extractTags(item.task.metadata.description).map((t: string) => 
+		const taskTags = extractTags(item.task.description).map((t: string) => 
 			t.toLowerCase().startsWith("#") ? t.toLowerCase().substring(1) : t.toLowerCase()
 		);
 		if (!taskTags.some((t: string) => t.includes(cleanQuery))) {
@@ -67,9 +67,9 @@ export function matchFilter(item: TaskListItem, filter: FilterConfig): boolean {
 	// Date filters
 	const today = todayString();
 	const activeFields = [
-		{ val: item.task.metadata.dates.start, field: filter.startDate },
-		{ val: item.task.metadata.dates.scheduled, field: filter.scheduledDate },
-		{ val: item.task.metadata.dates.due, field: filter.dueDate }
+		{ val: item.task.dates.start, field: filter.startDate },
+		{ val: item.task.dates.scheduled, field: filter.scheduledDate },
+		{ val: item.task.dates.due, field: filter.dueDate }
 	].filter(x => x.field && x.field.mode !== "all");
 
 	if (activeFields.length > 0) {

@@ -8,16 +8,15 @@ function makeItem(overrides: Partial<TaskTodoSortableItem> = {}): TaskTodoSortab
 		lineNumber: 1,
 		depth: 0,
 		task: {
-			status: { symbol: " ", type: "TODO" },
-			metadata: {
-				description: "task",
-				priority: null,
-				dates: { start: null, scheduled: null, due: null, done: null },
-				recurrence: null,
-				onCompletion: null,
-				id: null,
-				dependsOn: null,
-			},
+			status: "TODO",
+			description: "task",
+			priority: null,
+			dates: { start: null, created: null, scheduled: null, due: null, done: null, cancelled: null },
+			recurrence: null,
+			onCompletion: null,
+			id: null,
+			dependsOn: null,
+			blockLink: null,
 		},
 		date: null,
 		dateType: null,
@@ -25,14 +24,8 @@ function makeItem(overrides: Partial<TaskTodoSortableItem> = {}): TaskTodoSortab
 
 	const mergedTask = {
 		...base.task,
-		status: overrides.task?.status ? { ...base.task.status, ...overrides.task.status } : base.task.status,
-		metadata: overrides.task?.metadata
-			? {
-					...base.task.metadata,
-					...overrides.task.metadata,
-					dates: overrides.task.metadata.dates ? { ...base.task.metadata.dates, ...overrides.task.metadata.dates } : base.task.metadata.dates,
-				}
-			: base.task.metadata,
+		...overrides.task,
+		dates: overrides.task?.dates ? { ...base.task.dates, ...overrides.task.dates } : base.task.dates,
 	};
 
 	return {
@@ -47,32 +40,18 @@ describe("getTaskDateValue 和 getLifeLength", () => {
 	test("getTaskDateValue 取 due 和 scheduled 中较小的", () => {
 		const item1 = makeItem({
 			task: {
-				status: { symbol: " ", type: "TODO" },
-				metadata: {
-					description: "t",
-					priority: null,
-					dates: { start: null, scheduled: "2024-06-15", due: "2024-06-10", done: null },
-					recurrence: null,
-					onCompletion: null,
-					id: null,
-					dependsOn: null,
-				},
+				status: "TODO",
+				description: "t",
+				dates: { start: null, created: null, scheduled: "2024-06-15", due: "2024-06-10", done: null, cancelled: null },
 			},
 		});
 		expect(getTaskDateValue(item1.task)).toBe("2024-06-10");
 
 		const item2 = makeItem({
 			task: {
-				status: { symbol: " ", type: "TODO" },
-				metadata: {
-					description: "t",
-					priority: null,
-					dates: { start: null, scheduled: "2024-06-05", due: "2024-06-10", done: null },
-					recurrence: null,
-					onCompletion: null,
-					id: null,
-					dependsOn: null,
-				},
+				status: "TODO",
+				description: "t",
+				dates: { start: null, created: null, scheduled: "2024-06-05", due: "2024-06-10", done: null, cancelled: null },
 			},
 		});
 		expect(getTaskDateValue(item2.task)).toBe("2024-06-05");
@@ -81,16 +60,9 @@ describe("getTaskDateValue 和 getLifeLength", () => {
 	test("getLifeLength 计算 min(due-start, scheduled-start)", () => {
 		const item = makeItem({
 			task: {
-				status: { symbol: " ", type: "TODO" },
-				metadata: {
-					description: "t",
-					priority: null,
-					dates: { start: "2024-06-01", scheduled: "2024-06-11", due: "2024-06-06", done: null },
-					recurrence: null,
-					onCompletion: null,
-					id: null,
-					dependsOn: null,
-				},
+				status: "TODO",
+				description: "t",
+				dates: { start: "2024-06-01", created: null, scheduled: "2024-06-11", due: "2024-06-06", done: null, cancelled: null },
 			},
 		});
 		expect(getLifeLength(item.task)).toBe(5);
@@ -108,30 +80,16 @@ describe("compareTaskTodoItems", () => {
 		test("highest 排在 high 前面", () => {
 			const highest = makeItem({
 				task: {
-					status: { symbol: " ", type: "TODO" },
-					metadata: {
-						description: "t",
-						priority: TASK_SYMBOLS.priority.highest,
-						dates: { start: null, scheduled: null, due: null, done: null },
-						recurrence: null,
-						onCompletion: null,
-						id: null,
-						dependsOn: null,
-					},
+					status: "TODO",
+					description: "t",
+					priority: TASK_SYMBOLS.priority.highest,
 				},
 			});
 			const high = makeItem({
 				task: {
-					status: { symbol: " ", type: "TODO" },
-					metadata: {
-						description: "t",
-						priority: TASK_SYMBOLS.priority.high,
-						dates: { start: null, scheduled: null, due: null, done: null },
-						recurrence: null,
-						onCompletion: null,
-						id: null,
-						dependsOn: null,
-					},
+					status: "TODO",
+					description: "t",
+					priority: TASK_SYMBOLS.priority.high,
 				},
 			});
 			expect(compareTaskTodoItems(highest, high, ["importance"])).toBeLessThan(0);
@@ -140,30 +98,16 @@ describe("compareTaskTodoItems", () => {
 		test("high 排在 medium 前面", () => {
 			const high = makeItem({
 				task: {
-					status: { symbol: " ", type: "TODO" },
-					metadata: {
-						description: "t",
-						priority: TASK_SYMBOLS.priority.high,
-						dates: { start: null, scheduled: null, due: null, done: null },
-						recurrence: null,
-						onCompletion: null,
-						id: null,
-						dependsOn: null,
-					},
+					status: "TODO",
+					description: "t",
+					priority: TASK_SYMBOLS.priority.high,
 				},
 			});
 			const medium = makeItem({
 				task: {
-					status: { symbol: " ", type: "TODO" },
-					metadata: {
-						description: "t",
-						priority: TASK_SYMBOLS.priority.medium,
-						dates: { start: null, scheduled: null, due: null, done: null },
-						recurrence: null,
-						onCompletion: null,
-						id: null,
-						dependsOn: null,
-					},
+					status: "TODO",
+					description: "t",
+					priority: TASK_SYMBOLS.priority.medium,
 				},
 			});
 			expect(compareTaskTodoItems(high, medium, ["importance"])).toBeLessThan(0);
@@ -173,16 +117,9 @@ describe("compareTaskTodoItems", () => {
 			const none = makeItem();
 			const low = makeItem({
 				task: {
-					status: { symbol: " ", type: "TODO" },
-					metadata: {
-						description: "t",
-						priority: TASK_SYMBOLS.priority.low,
-						dates: { start: null, scheduled: null, due: null, done: null },
-						recurrence: null,
-						onCompletion: null,
-						id: null,
-						dependsOn: null,
-					},
+					status: "TODO",
+					description: "t",
+					priority: TASK_SYMBOLS.priority.low,
 				},
 			});
 			expect(compareTaskTodoItems(none, low, ["importance"])).toBeLessThan(0);
@@ -193,30 +130,14 @@ describe("compareTaskTodoItems", () => {
 		test("普通任务排在取消任务前面", () => {
 			const todo = makeItem({
 				task: {
-					status: { symbol: " ", type: "TODO" },
-					metadata: {
-						description: "t",
-						priority: null,
-						dates: { start: null, scheduled: null, due: null, done: null },
-						recurrence: null,
-						onCompletion: null,
-						id: null,
-						dependsOn: null,
-					},
+					status: "TODO",
+					description: "t",
 				},
 			});
 			const cancelled = makeItem({
 				task: {
-					status: { symbol: "-", type: "CANCELLED" },
-					metadata: {
-						description: "t",
-						priority: null,
-						dates: { start: null, scheduled: null, due: null, done: null },
-						recurrence: null,
-						onCompletion: null,
-						id: null,
-						dependsOn: null,
-					},
+					status: "CANCELLED",
+					description: "t",
 				},
 			});
 			expect(compareTaskTodoItems(todo, cancelled, ["cancelled"])).toBeLessThan(0);
@@ -228,30 +149,16 @@ describe("compareTaskTodoItems", () => {
 		test("较早日期排在较晚日期前面", () => {
 			const earlier = makeItem({
 				task: {
-					status: { symbol: " ", type: "TODO" },
-					metadata: {
-						description: "t",
-						priority: null,
-						dates: { start: null, scheduled: "2024-06-01", due: null, done: null },
-						recurrence: null,
-						onCompletion: null,
-						id: null,
-						dependsOn: null,
-					},
+					status: "TODO",
+					description: "t",
+					dates: { start: null, created: null, scheduled: "2024-06-01", due: null, done: null, cancelled: null },
 				},
 			});
 			const later = makeItem({
 				task: {
-					status: { symbol: " ", type: "TODO" },
-					metadata: {
-						description: "t",
-						priority: null,
-						dates: { start: null, scheduled: "2024-06-15", due: null, done: null },
-						recurrence: null,
-						onCompletion: null,
-						id: null,
-						dependsOn: null,
-					},
+					status: "TODO",
+					description: "t",
+					dates: { start: null, created: null, scheduled: "2024-06-15", due: null, done: null, cancelled: null },
 				},
 			});
 			expect(compareTaskTodoItems(earlier, later, ["date"])).toBeLessThan(0);
@@ -260,16 +167,9 @@ describe("compareTaskTodoItems", () => {
 		test("有日期排在无日期前面", () => {
 			const withDate = makeItem({
 				task: {
-					status: { symbol: " ", type: "TODO" },
-					metadata: {
-						description: "t",
-						priority: null,
-						dates: { start: null, scheduled: "2024-06-15", due: null, done: null },
-						recurrence: null,
-						onCompletion: null,
-						id: null,
-						dependsOn: null,
-					},
+					status: "TODO",
+					description: "t",
+					dates: { start: null, created: null, scheduled: "2024-06-15", due: null, done: null, cancelled: null },
 				},
 			});
 			const noDate = makeItem();
@@ -281,30 +181,16 @@ describe("compareTaskTodoItems", () => {
 		test("短生命长度排在长生命长度前面", () => {
 			const short = makeItem({
 				task: {
-					status: { symbol: " ", type: "TODO" },
-					metadata: {
-						description: "t",
-						priority: null,
-						dates: { start: "2024-06-01", scheduled: "2024-06-06", due: null, done: null },
-						recurrence: null,
-						onCompletion: null,
-						id: null,
-						dependsOn: null,
-					},
+					status: "TODO",
+					description: "t",
+					dates: { start: "2024-06-01", created: null, scheduled: "2024-06-06", due: null, done: null, cancelled: null },
 				},
 			});
 			const long = makeItem({
 				task: {
-					status: { symbol: " ", type: "TODO" },
-					metadata: {
-						description: "t",
-						priority: null,
-						dates: { start: "2024-06-01", scheduled: "2024-06-11", due: null, done: null },
-						recurrence: null,
-						onCompletion: null,
-						id: null,
-						dependsOn: null,
-					},
+					status: "TODO",
+					description: "t",
+					dates: { start: "2024-06-01", created: null, scheduled: "2024-06-11", due: null, done: null, cancelled: null },
 				},
 			});
 			expect(compareTaskTodoItems(short, long, ["lifeLength"])).toBeLessThan(0);
@@ -313,16 +199,9 @@ describe("compareTaskTodoItems", () => {
 		test("有生命长度排在无生命长度前面", () => {
 			const withLife = makeItem({
 				task: {
-					status: { symbol: " ", type: "TODO" },
-					metadata: {
-						description: "t",
-						priority: null,
-						dates: { start: "2024-06-01", scheduled: "2024-06-06", due: null, done: null },
-						recurrence: null,
-						onCompletion: null,
-						id: null,
-						dependsOn: null,
-					},
+					status: "TODO",
+					description: "t",
+					dates: { start: "2024-06-01", created: null, scheduled: "2024-06-06", due: null, done: null, cancelled: null },
 				},
 			});
 			const noLife = makeItem();

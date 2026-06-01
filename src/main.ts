@@ -157,130 +157,36 @@ export default class TaskTodoPlugin extends Plugin {
 		const data = await this.loadData();
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
 
-		const migrateFilter = (filter: any): FilterConfig => {
-			const newFilter = createDefaultFilter();
-			if (!filter) return newFilter;
-
-			if (typeof filter.completed === "string") {
-				newFilter.completed = filter.completed;
-			}
-			if (typeof filter.cancelled === "string") {
-				newFilter.cancelled = filter.cancelled;
-			} else if (filter.cancelled === undefined) {
-				newFilter.cancelled = "uncancelled";
-			}
-			if (Array.isArray(filter.priority)) {
-				newFilter.priority = filter.priority;
-			}
-			if (typeof filter.text === "string") {
-				newFilter.text = filter.text;
-			}
-			if (typeof filter.tag === "string") {
-				newFilter.tag = filter.tag;
-			}
-
-			// Dates migration:
-			if (filter.startDate && typeof filter.startDate === "object" && typeof filter.startDate.mode === "string") {
-				newFilter.startDate = { ...filter.startDate };
-			}
-			if (filter.scheduledDate && typeof filter.scheduledDate === "object" && typeof filter.scheduledDate.mode === "string") {
-				newFilter.scheduledDate = { ...filter.scheduledDate };
-			}
-			if (filter.dueDate && typeof filter.dueDate === "object" && typeof filter.dueDate.mode === "string") {
-				newFilter.dueDate = { ...filter.dueDate };
-			}
-			if (typeof filter.dateFilterRelation === "string") {
-				newFilter.dateFilterRelation = filter.dateFilterRelation;
-			}
-
-			// Old dates field fallback
-			if (typeof filter.dates === "string" && filter.dates !== "all" &&
-				newFilter.startDate.mode === "all" && newFilter.scheduledDate.mode === "all" && newFilter.dueDate.mode === "all") {
-				const oldMode = filter.dates;
-				const customStart = filter.customDateStart;
-				const customEnd = filter.customDateEnd;
-				
-				newFilter.dateFilterRelation = oldMode === "no-date" ? "and" : "or";
-				newFilter.startDate = { mode: oldMode, customStart, customEnd };
-				newFilter.scheduledDate = { mode: oldMode, customStart, customEnd };
-				newFilter.dueDate = { mode: oldMode, customStart, customEnd };
-			}
-
-			return newFilter;
-		};
-
 		const createDefaultColumns = (): ColumnConfig[] => [
 			{
 				id: "overdue_" + Math.random(),
 				title: t("taskTodo.group.overdue") || "已过期",
-				filter: {
-					...createDefaultFilter(),
-					completed: "all",
-					dateFilterRelation: "or",
-					startDate: { mode: "overdue" },
-					scheduledDate: { mode: "overdue" },
-					dueDate: { mode: "overdue" },
-				}
+				filter: getEnforcedColumnFilter("overdue")
 			},
 			{
 				id: "today_" + Math.random(),
 				title: t("taskTodo.group.today") || "今天",
-				filter: {
-					...createDefaultFilter(),
-					completed: "all",
-					dateFilterRelation: "or",
-					startDate: { mode: "today" },
-					scheduledDate: { mode: "today" },
-					dueDate: { mode: "today" },
-				}
+				filter: getEnforcedColumnFilter("today")
 			},
 			{
 				id: "tomorrow_" + Math.random(),
 				title: t("taskTodo.group.tomorrow") || "明天",
-				filter: {
-					...createDefaultFilter(),
-					completed: "all",
-					dateFilterRelation: "or",
-					startDate: { mode: "tomorrow" },
-					scheduledDate: { mode: "tomorrow" },
-					dueDate: { mode: "tomorrow" },
-				}
+				filter: getEnforcedColumnFilter("tomorrow")
 			},
 			{
 				id: "week_" + Math.random(),
 				title: t("taskTodo.group.next7Days") || "本周",
-				filter: {
-					...createDefaultFilter(),
-					completed: "all",
-					dateFilterRelation: "or",
-					startDate: { mode: "this-week" },
-					scheduledDate: { mode: "this-week" },
-					dueDate: { mode: "this-week" },
-				}
+				filter: getEnforcedColumnFilter("week")
 			},
 			{
 				id: "later_" + Math.random(),
 				title: t("taskTodo.group.later") || "以后",
-				filter: {
-					...createDefaultFilter(),
-					completed: "all",
-					dateFilterRelation: "or",
-					startDate: { mode: "later" },
-					scheduledDate: { mode: "later" },
-					dueDate: { mode: "later" },
-				}
+				filter: getEnforcedColumnFilter("later")
 			},
 			{
 				id: "no-date_" + Math.random(),
 				title: t("taskTodo.group.noDate") || "无日期",
-				filter: {
-					...createDefaultFilter(),
-					completed: "all",
-					dateFilterRelation: "and",
-					startDate: { mode: "no-date" },
-					scheduledDate: { mode: "no-date" },
-					dueDate: { mode: "no-date" },
-				}
+				filter: getEnforcedColumnFilter("no-date")
 			}
 		];
 
@@ -289,49 +195,27 @@ export default class TaskTodoPlugin extends Plugin {
 				{
 					id: "in-plan",
 					title: t("taskTodo.tab.inPlan"),
-					filter: {
-						...createDefaultFilter(),
-						completed: "uncompleted",
-						dateFilterRelation: "or",
-						startDate: { mode: "has-date" },
-						scheduledDate: { mode: "has-date" },
-						dueDate: { mode: "has-date" },
-					},
+					filter: getEnforcedTabFilter("in-plan"),
 					columns: createDefaultColumns()
 				},
 				{
 					id: "today",
 					title: t("taskTodo.tab.today"),
-					filter: {
-						...createDefaultFilter(),
-						completed: "uncompleted",
-						dateFilterRelation: "or",
-						startDate: { mode: "today" },
-						scheduledDate: { mode: "today" },
-						dueDate: { mode: "today" },
-					},
+					filter: getEnforcedTabFilter("today"),
 					columns: createDefaultColumns()
 				}
 			];
 		} else {
 			for (const tab of this.settings.tabs) {
-				tab.filter = migrateFilter(tab.filter);
+				tab.filter = getEnforcedTabFilter(tab.id);
 				if (!tab.columns) {
 					tab.columns = [];
 				}
 				if (tab.columns.length === 0) {
-					if (data && Array.isArray(data.columns) && data.columns.length > 0) {
-						tab.columns = data.columns.map((c: any) => ({
-							id: c.id || "col_" + Math.random(),
-							title: c.title,
-							filter: migrateFilter(c.filter)
-						}));
-					} else {
-						tab.columns = createDefaultColumns();
-					}
+					tab.columns = createDefaultColumns();
 				} else {
 					for (const col of tab.columns) {
-						col.filter = migrateFilter(col.filter);
+						col.filter = getEnforcedColumnFilter(col.id);
 					}
 				}
 			}
@@ -339,6 +223,16 @@ export default class TaskTodoPlugin extends Plugin {
 	}
 
 	async saveSettings(): Promise<void> {
+		if (this.settings.tabs) {
+			for (const tab of this.settings.tabs) {
+				tab.filter = getEnforcedTabFilter(tab.id);
+				if (tab.columns) {
+					for (const col of tab.columns) {
+						col.filter = getEnforcedColumnFilter(col.id);
+					}
+				}
+			}
+		}
 		await this.saveData(this.settings);
 		// 当设置更改时，重新渲染视图
 		const leaves = this.app.workspace.getLeavesOfType(TASKTODO_VIEW);
@@ -478,17 +372,7 @@ export default class TaskTodoPlugin extends Plugin {
 
 		// 状态变更通过专用 API 处理（editTask 不涉及状态）
 		if (newFields.statusSymbol !== oldFields.statusSymbol) {
-			const newStatusType = this.host.statusRegistry.get(newFields.statusSymbol).type;
-			const oldStatusType = this.host.statusRegistry.get(oldFields.statusSymbol).type;
-			if (newStatusType === "DONE") {
-				await this.host.api.finishTask(file.path, cursor.line);
-			} else if (newStatusType === "CANCELLED") {
-				await this.host.api.cancelTask(file.path, cursor.line);
-			} else if (oldStatusType === "DONE") {
-				await this.host.api.unfinishTask(file.path, cursor.line);
-			} else if (oldStatusType === "CANCELLED") {
-				await this.host.api.uncancelTask(file.path, cursor.line);
-			}
+			await this.host.api.updateTaskStatus(file.path, cursor.line, newFields.statusSymbol);
 		}
 	}
 
@@ -651,14 +535,14 @@ class TaskTodoSettingTab extends PluginSettingTab {
 						const newTab: TabConfig = {
 							id: "tab_" + Date.now(),
 							title: "New Tab",
-							filter: createDefaultFilter(),
+							filter: getEnforcedTabFilter("tab_" + Date.now()),
 							columns: []
 						};
 						new TabOrColumnModal(this.app, newTab, async (result) => {
 							const tab: TabConfig = {
 								id: newTab.id,
 								title: result.title,
-								filter: result.filter,
+								filter: getEnforcedTabFilter(newTab.id),
 								columns: []
 							};
 							this.plugin.settings.tabs.push(tab);
@@ -706,9 +590,7 @@ class TaskTodoSettingTab extends PluginSettingTab {
 				this.display();
 			});
 			
-			const summary = tabCard.createDiv({ cls: "taskslite-list-parent", attr: { style: "font-size: 0.85rem; margin-bottom: 0.75rem;" } });
-			const priorityStr = tab.filter.priority && tab.filter.priority.length > 0 ? tab.filter.priority.join(",") : "all";
-			summary.setText(`Filter -> Completed: ${tab.filter.completed}, Cancelled: ${tab.filter.cancelled}, Priority: ${priorityStr}, Text: "${tab.filter.text || ""}", Tag: "${tab.filter.tag || ""}"`);
+
 
 			const colHeader = tabCard.createDiv({ cls: "tasktodo-nested-header" });
 			colHeader.createDiv({ cls: "tasktodo-nested-title", text: t("settings.columns.title") });
@@ -722,13 +604,13 @@ class TaskTodoSettingTab extends PluginSettingTab {
 				const newCol: ColumnConfig = {
 					id: "col_" + Date.now(),
 					title: "New Column",
-					filter: createDefaultFilter()
+					filter: getEnforcedColumnFilter("col_" + Date.now())
 				};
 				new TabOrColumnModal(this.app, newCol, async (result) => {
 					const col: ColumnConfig = {
 						id: newCol.id,
 						title: result.title,
-						filter: result.filter
+						filter: getEnforcedColumnFilter(newCol.id)
 					};
 					tab.columns.push(col);
 					await this.plugin.saveSettings();
@@ -748,9 +630,6 @@ class TaskTodoSettingTab extends PluginSettingTab {
 				
 				const titleContainer = colEl.createDiv({ cls: "tasktodo-sort-item-title" });
 				titleContainer.createEl("strong", { text: col.title });
-				const colPriorityStr = col.filter.priority && col.filter.priority.length > 0 ? col.filter.priority.join(",") : "all";
-				const colFilterDesc = `[Completed: ${col.filter.completed}, Cancelled: ${col.filter.cancelled}, Priority: ${colPriorityStr}]`;
-				titleContainer.createEl("span", { text: ` ${colFilterDesc}`, cls: "taskslite-list-parent" });
 				
 				const colActions = colEl.createDiv({ cls: "tasktodo-sort-item-actions" });
 				
@@ -867,6 +746,138 @@ export const createDefaultFilter = (): FilterConfig => ({
 	dueDate: { mode: "all" },
 });
 
+export const getEnforcedTabFilter = (tabId: string): FilterConfig => {
+	if (tabId === "in-plan") {
+		return {
+			completed: "uncompleted",
+			cancelled: "uncancelled",
+			priority: [],
+			text: "",
+			tag: "",
+			dateFilterRelation: "or",
+			startDate: { mode: "has-date" },
+			scheduledDate: { mode: "has-date" },
+			dueDate: { mode: "has-date" },
+		};
+	}
+	if (tabId === "today") {
+		return {
+			completed: "uncompleted",
+			cancelled: "uncancelled",
+			priority: [],
+			text: "",
+			tag: "",
+			dateFilterRelation: "or",
+			startDate: { mode: "today" },
+			scheduledDate: { mode: "today" },
+			dueDate: { mode: "today" },
+		};
+	}
+	return {
+		completed: "uncompleted",
+		cancelled: "uncancelled",
+		priority: [],
+		text: "",
+		tag: "",
+		dateFilterRelation: "or",
+		startDate: { mode: "all" },
+		scheduledDate: { mode: "all" },
+		dueDate: { mode: "all" },
+	};
+};
+
+export const getEnforcedColumnFilter = (colId: string): FilterConfig => {
+	if (colId.startsWith("overdue")) {
+		return {
+			completed: "all",
+			cancelled: "uncancelled",
+			priority: [],
+			text: "",
+			tag: "",
+			dateFilterRelation: "or",
+			startDate: { mode: "overdue" },
+			scheduledDate: { mode: "overdue" },
+			dueDate: { mode: "overdue" },
+		};
+	}
+	if (colId.startsWith("today")) {
+		return {
+			completed: "all",
+			cancelled: "uncancelled",
+			priority: [],
+			text: "",
+			tag: "",
+			dateFilterRelation: "or",
+			startDate: { mode: "today" },
+			scheduledDate: { mode: "today" },
+			dueDate: { mode: "today" },
+		};
+	}
+	if (colId.startsWith("tomorrow")) {
+		return {
+			completed: "all",
+			cancelled: "uncancelled",
+			priority: [],
+			text: "",
+			tag: "",
+			dateFilterRelation: "or",
+			startDate: { mode: "tomorrow" },
+			scheduledDate: { mode: "tomorrow" },
+			dueDate: { mode: "tomorrow" },
+		};
+	}
+	if (colId.startsWith("week") || colId.startsWith("this-week")) {
+		return {
+			completed: "all",
+			cancelled: "uncancelled",
+			priority: [],
+			text: "",
+			tag: "",
+			dateFilterRelation: "or",
+			startDate: { mode: "this-week" },
+			scheduledDate: { mode: "this-week" },
+			dueDate: { mode: "this-week" },
+		};
+	}
+	if (colId.startsWith("later")) {
+		return {
+			completed: "all",
+			cancelled: "uncancelled",
+			priority: [],
+			text: "",
+			tag: "",
+			dateFilterRelation: "or",
+			startDate: { mode: "later" },
+			scheduledDate: { mode: "later" },
+			dueDate: { mode: "later" },
+		};
+	}
+	if (colId.startsWith("no-date")) {
+		return {
+			completed: "all",
+			cancelled: "uncancelled",
+			priority: [],
+			text: "",
+			tag: "",
+			dateFilterRelation: "and",
+			startDate: { mode: "no-date" },
+			scheduledDate: { mode: "no-date" },
+			dueDate: { mode: "no-date" },
+		};
+	}
+	return {
+		completed: "all",
+		cancelled: "uncancelled",
+		priority: [],
+		text: "",
+		tag: "",
+		dateFilterRelation: "or",
+		startDate: { mode: "all" },
+		scheduledDate: { mode: "all" },
+		dueDate: { mode: "all" },
+	};
+};
+
 class TabOrColumnModal extends Modal {
 	private result: {
 		title: string;
@@ -900,97 +911,6 @@ class TabOrColumnModal extends Modal {
 			);
 
 		new Setting(contentEl)
-			.setName(t("taskTodo.filterCompleted"))
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("all", t("taskTodo.datesFilter.all"))
-					.addOption("uncompleted", t("taskTodo.hideCompleted"))
-					.addOption("completed", t("taskTodo.showCompleted"))
-					.setValue(this.result.filter.completed)
-					.onChange((val) => {
-						this.result.filter.completed = val as any;
-					})
-			);
-
-		new Setting(contentEl)
-			.setName(t("taskTodo.filterCancelled"))
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("all", t("taskTodo.datesFilter.all"))
-					.addOption("uncancelled", t("taskTodo.status.uncancelled"))
-					.addOption("cancelled", t("taskTodo.status.cancelled"))
-					.setValue(this.result.filter.cancelled)
-					.onChange((val) => {
-						this.result.filter.cancelled = val as any;
-					})
-			);
-
-		new Setting(contentEl)
-			.setName(t("taskTodo.filterText.name"))
-			.addText((text) =>
-				text
-					.setValue(this.result.filter.text || "")
-					.setPlaceholder(t("taskTodo.filterText.placeholder"))
-					.onChange((val) => {
-						this.result.filter.text = val;
-					})
-			);
-
-		new Setting(contentEl)
-			.setName(t("taskTodo.filterTag.name"))
-			.addText((text) =>
-				text
-					.setValue(this.result.filter.tag || "")
-					.setPlaceholder(t("taskTodo.filterTag.placeholder"))
-					.onChange((val) => {
-						this.result.filter.tag = val;
-					})
-			);
-
-		const priorityContainer = contentEl.createDiv({ cls: "tasktodo-priority-container" });
-		priorityContainer.createSpan({ text: t("modal.priority") + ": " });
-		const priorityKeys = ["highest", "high", "medium", "low", "lowest", "none"];
-		const priorityLabels = {
-			highest: "🔺 " + t("priority.highest"),
-			high: "⏫ " + t("priority.high"),
-			medium: "🔼 " + t("priority.medium"),
-			low: "🔽 " + t("priority.low"),
-			lowest: "⏬ " + t("priority.lowest"),
-			none: t("common.none")
-		};
-		priorityKeys.forEach((key) => {
-			const labelEl = priorityContainer.createEl("label", { cls: "tasktodo-priority-label" });
-			const check = labelEl.createEl("input", { type: "checkbox" });
-			check.checked = this.result.filter.priority.includes(key);
-			check.addEventListener("change", () => {
-				if (check.checked) {
-					if (!this.result.filter.priority.includes(key)) {
-						this.result.filter.priority.push(key);
-					}
-				} else {
-					this.result.filter.priority = this.result.filter.priority.filter((p: string) => p !== key);
-				}
-			});
-			labelEl.createSpan({ text: " " + (priorityLabels as any)[key] });
-		});
-
-		new Setting(contentEl)
-			.setName(t("taskTodo.dateRelation.name"))
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("or", t("taskTodo.dateRelation.or"))
-					.addOption("and", t("taskTodo.dateRelation.and"))
-					.setValue(this.result.filter.dateFilterRelation || "or")
-					.onChange((val) => {
-						this.result.filter.dateFilterRelation = val as any;
-					})
-			);
-
-		this.addDateFieldSetting(contentEl, t("modal.startDate") || "开始日期", "startDate");
-		this.addDateFieldSetting(contentEl, t("modal.scheduledDate") || "计划日期", "scheduledDate");
-		this.addDateFieldSetting(contentEl, t("modal.dueDate") || "截止日期", "dueDate");
-
-		new Setting(contentEl)
 			.addButton((button) =>
 				button
 					.setButtonText(t("common.cancel"))
@@ -1009,57 +929,6 @@ class TabOrColumnModal extends Modal {
 						this.close();
 					})
 			);
-	}
-
-	private addDateFieldSetting(container: HTMLElement, name: string, fieldName: "startDate" | "scheduledDate" | "dueDate") {
-		const field = this.result.filter[fieldName];
-		const customContainer = container.createDiv();
-
-		const renderCustom = () => {
-			customContainer.empty();
-			if (field.mode === "custom") {
-				new Setting(customContainer)
-					.setName(t("modal.startDate") || "开始日期")
-					.addText((text) => {
-						text.inputEl.type = "date";
-						text.setValue(field.customStart || "")
-							.onChange((val) => {
-								field.customStart = val;
-							});
-					});
-				new Setting(customContainer)
-					.setName(t("modal.dueDate") || "结束日期")
-					.addText((text) => {
-						text.inputEl.type = "date";
-						text.setValue(field.customEnd || "")
-							.onChange((val) => {
-								field.customEnd = val;
-							});
-					});
-			}
-		};
-
-		new Setting(container)
-			.setName(name)
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOption("all", t("taskTodo.datesFilter.all"))
-					.addOption("today", t("taskTodo.datesFilter.today"))
-					.addOption("tomorrow", t("taskTodo.datesFilter.tomorrow"))
-					.addOption("this-week", t("taskTodo.datesFilter.thisWeek"))
-					.addOption("overdue", t("taskTodo.datesFilter.overdue"))
-					.addOption("later", t("taskTodo.group.later"))
-					.addOption("no-date", t("taskTodo.datesFilter.noDate"))
-					.addOption("has-date", t("taskTodo.tab.inPlan"))
-					.addOption("custom", t("taskTodo.datesFilter.custom"))
-					.setValue(field.mode)
-					.onChange((val) => {
-						field.mode = val as any;
-						renderCustom();
-					})
-			);
-
-		renderCustom();
 	}
 
 	onClose() {
