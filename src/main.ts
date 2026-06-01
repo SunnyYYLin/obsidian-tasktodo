@@ -31,6 +31,8 @@ export interface FilterConfig {
 export interface TabConfig {
 	id: string;
 	title: string;
+	queryMode?: "gui" | "advanced";
+	query?: string;
 	filter: FilterConfig;
 	columns: ColumnConfig[];
 }
@@ -38,6 +40,8 @@ export interface TabConfig {
 export interface ColumnConfig {
 	id: string;
 	title: string;
+	queryMode?: "gui" | "advanced";
+	query?: string;
 	filter: FilterConfig;
 }
 
@@ -161,31 +165,43 @@ export default class TaskTodoPlugin extends Plugin {
 			{
 				id: "overdue_" + Math.random(),
 				title: t("taskTodo.group.earlier") || "早前",
+				queryMode: "gui",
+				query: getEnforcedColumnDQL("in-plan", "overdue"),
 				filter: getEnforcedColumnFilter("overdue")
 			},
 			{
 				id: "today_" + Math.random(),
 				title: t("taskTodo.group.today") || "今天",
+				queryMode: "gui",
+				query: getEnforcedColumnDQL("in-plan", "today"),
 				filter: getEnforcedColumnFilter("today")
 			},
 			{
 				id: "tomorrow_" + Math.random(),
 				title: t("taskTodo.group.tomorrow") || "明天",
+				queryMode: "gui",
+				query: getEnforcedColumnDQL("in-plan", "tomorrow"),
 				filter: getEnforcedColumnFilter("tomorrow")
 			},
 			{
 				id: "week_" + Math.random(),
 				title: t("taskTodo.group.next7Days") || "本周",
+				queryMode: "gui",
+				query: getEnforcedColumnDQL("in-plan", "week"),
 				filter: getEnforcedColumnFilter("week")
 			},
 			{
 				id: "later_" + Math.random(),
 				title: t("taskTodo.group.later") || "以后",
+				queryMode: "gui",
+				query: getEnforcedColumnDQL("in-plan", "later"),
 				filter: getEnforcedColumnFilter("later")
 			},
 			{
 				id: "no-date_" + Math.random(),
 				title: t("taskTodo.group.noDate") || "无日期",
+				queryMode: "gui",
+				query: getEnforcedColumnDQL("in-plan", "no-date"),
 				filter: getEnforcedColumnFilter("no-date")
 			}
 		];
@@ -194,11 +210,15 @@ export default class TaskTodoPlugin extends Plugin {
 			{
 				id: "overdue_" + Math.random(),
 				title: t("taskTodo.group.overdue") || "已过期",
+				queryMode: "gui",
+				query: getEnforcedColumnDQL("today", "overdue"),
 				filter: getEnforcedColumnFilter("overdue")
 			},
 			{
 				id: "today_" + Math.random(),
 				title: t("taskTodo.group.today") || "今天",
+				queryMode: "gui",
+				query: getEnforcedColumnDQL("today", "today"),
 				filter: getEnforcedColumnFilter("today")
 			}
 		];
@@ -208,18 +228,28 @@ export default class TaskTodoPlugin extends Plugin {
 				{
 					id: "in-plan",
 					title: t("taskTodo.tab.inPlan"),
+					queryMode: "gui",
+					query: getEnforcedTabDQL("in-plan"),
 					filter: getEnforcedTabFilter("in-plan"),
 					columns: createDefaultInPlanColumns()
 				},
 				{
 					id: "today",
 					title: t("taskTodo.tab.today"),
+					queryMode: "gui",
+					query: getEnforcedTabDQL("today"),
 					filter: getEnforcedTabFilter("today"),
 					columns: createDefaultTodayColumns()
 				}
 			];
 		} else {
 			for (const tab of this.settings.tabs) {
+				if (!tab.queryMode) {
+					tab.queryMode = "gui";
+				}
+				if (!tab.query || tab.query.trim() === "") {
+					tab.query = getEnforcedTabDQL(tab.id);
+				}
 				tab.filter = getEnforcedTabFilter(tab.id);
 				tab.columns = alignTabColumns(tab.id, tab.columns || []);
 			}
@@ -229,16 +259,25 @@ export default class TaskTodoPlugin extends Plugin {
 	async saveSettings(): Promise<void> {
 		if (this.settings.tabs) {
 			for (const tab of this.settings.tabs) {
-				tab.filter = getEnforcedTabFilter(tab.id);
+				if (tab.id === "today" || tab.id === "in-plan") {
+					tab.filter = getEnforcedTabFilter(tab.id);
+				}
+				if (tab.queryMode === "gui" || !tab.queryMode) {
+					tab.queryMode = "gui";
+					tab.query = filterConfigToDQL(tab.filter);
+				}
 				if (tab.columns) {
 					for (const col of tab.columns) {
-						col.filter = getEnforcedColumnFilter(col.id);
-						if (col.id.startsWith("overdue")) {
-							if (tab.id === "today") {
-								col.title = t("taskTodo.group.overdue") || "已过期";
-							} else {
-								col.title = t("taskTodo.group.earlier") || "早前";
+						const key = getColumnKey(col.id);
+						if (key && (tab.id === "today" || tab.id === "in-plan")) {
+							col.filter = getEnforcedColumnFilter(col.id);
+							if (col.id.startsWith("overdue")) {
+								col.title = tab.id === "today" ? (t("taskTodo.group.overdue") || "已过期") : (t("taskTodo.group.earlier") || "早前");
 							}
+						}
+						if (col.queryMode === "gui" || !col.queryMode) {
+							col.queryMode = "gui";
+							col.query = filterConfigToDQL(col.filter);
 						}
 					}
 				}
@@ -546,6 +585,8 @@ class TaskTodoSettingTab extends PluginSettingTab {
 						const newTab: TabConfig = {
 							id: "tab_" + Date.now(),
 							title: "New Tab",
+							queryMode: "gui",
+							query: filterConfigToDQL(getEnforcedTabFilter("tab_" + Date.now())),
 							filter: getEnforcedTabFilter("tab_" + Date.now()),
 							columns: []
 						};
@@ -553,7 +594,9 @@ class TaskTodoSettingTab extends PluginSettingTab {
 							const tab: TabConfig = {
 								id: newTab.id,
 								title: result.title,
-								filter: getEnforcedTabFilter(newTab.id),
+								queryMode: result.queryMode,
+								query: result.query,
+								filter: result.filter,
 								columns: []
 							};
 							this.plugin.settings.tabs.push(tab);
@@ -584,6 +627,8 @@ class TaskTodoSettingTab extends PluginSettingTab {
 			editTabBtn.addEventListener("click", () => {
 				new TabOrColumnModal(this.app, tab, async (result) => {
 					tab.title = result.title;
+					tab.queryMode = result.queryMode;
+					tab.query = result.query;
 					tab.filter = result.filter;
 					await this.plugin.saveSettings();
 					this.display();
@@ -615,13 +660,17 @@ class TaskTodoSettingTab extends PluginSettingTab {
 				const newCol: ColumnConfig = {
 					id: "col_" + Date.now(),
 					title: "New Column",
+					queryMode: "gui",
+					query: filterConfigToDQL(getEnforcedColumnFilter("col_" + Date.now())),
 					filter: getEnforcedColumnFilter("col_" + Date.now())
 				};
 				new TabOrColumnModal(this.app, newCol, async (result) => {
 					const col: ColumnConfig = {
 						id: newCol.id,
 						title: result.title,
-						filter: getEnforcedColumnFilter(newCol.id)
+						queryMode: result.queryMode,
+						query: result.query,
+						filter: result.filter
 					};
 					tab.columns.push(col);
 					await this.plugin.saveSettings();
@@ -653,6 +702,8 @@ class TaskTodoSettingTab extends PluginSettingTab {
 					e.stopPropagation();
 					new TabOrColumnModal(this.app, col, async (result) => {
 						col.title = result.title;
+						col.queryMode = result.queryMode;
+						col.query = result.query;
 						col.filter = result.filter;
 						await this.plugin.saveSettings();
 						this.display();
@@ -900,6 +951,122 @@ export const getColumnKey = (colId: string): string | null => {
 	return null;
 };
 
+export const getEnforcedTabDQL = (tabId: string): string => {
+	if (tabId === "in-plan") {
+		return 'status != "CANCELLED"';
+	}
+	if (tabId === "today") {
+		return 'status != "DONE" AND status != "CANCELLED" AND (due <= date(today) OR scheduled <= date(today) OR start <= date(today))';
+	}
+	return "";
+};
+
+export const getEnforcedColumnDQL = (tabId: string, colKey: string): string => {
+	if (colKey === "overdue") {
+		if (tabId === "today") {
+			return 'status != "DONE" AND status != "CANCELLED" AND (due < date(today) OR scheduled < date(today) OR start < date(today))';
+		} else {
+			return 'status != "CANCELLED" AND (due < date(today) OR scheduled < date(today) OR start < date(today))';
+		}
+	}
+	if (colKey === "today") {
+		return 'status != "DONE" AND status != "CANCELLED" AND (due = date(today) OR scheduled = date(today) OR start = date(today))';
+	}
+	if (colKey === "tomorrow") {
+		return 'status != "DONE" AND status != "CANCELLED" AND (due = date(tomorrow) OR scheduled = date(tomorrow) OR start = date(tomorrow))';
+	}
+	if (colKey === "week") {
+		return 'status != "DONE" AND status != "CANCELLED" AND ((due >= date(today) AND due <= date(next-week)) OR (scheduled >= date(today) AND scheduled <= date(next-week)) OR (start >= date(today) AND start <= date(next-week)))';
+	}
+	if (colKey === "later") {
+		return 'status != "DONE" AND status != "CANCELLED" AND (due > date(next-week) OR scheduled > date(next-week) OR start > date(next-week))';
+	}
+	if (colKey === "no-date") {
+		return 'status != "DONE" AND status != "CANCELLED" AND due = null AND scheduled = null AND start = null';
+	}
+	return "";
+};
+
+export const filterConfigToDQL = (filter: FilterConfig): string => {
+	if (!filter) return "";
+	const parts: string[] = [];
+
+	// 1. Completed
+	if (filter.completed === "completed") {
+		parts.push('status = "DONE"');
+	} else if (filter.completed === "uncompleted") {
+		parts.push('status != "DONE"');
+	}
+
+	// 2. Cancelled
+	if (filter.cancelled === "cancelled") {
+		parts.push('status = "CANCELLED"');
+	} else if (filter.cancelled === "uncancelled") {
+		parts.push('status != "CANCELLED"');
+	}
+
+	// 3. Priority
+	if (filter.priority && filter.priority.length > 0) {
+		const priParts = filter.priority.map(pri => {
+			if (pri === "none") return 'priority = ""';
+			let emoji = "";
+			if (pri === "highest") emoji = "⏫";
+			else if (pri === "high") emoji = "🔼";
+			else if (pri === "medium") emoji = "🔽";
+			else if (pri === "low") emoji = "🔻";
+			else if (pri === "lowest") emoji = "⏬";
+			return `priority = "${emoji}"`;
+		}).filter(Boolean);
+		if (priParts.length > 0) {
+			parts.push(`(${priParts.join(" OR ")})`);
+		}
+	}
+
+	// 4. Dates
+	const dateParts: string[] = [];
+	const handleDateField = (field: DateFilterField, name: string) => {
+		if (!field || field.mode === "all") return;
+		if (field.mode === "no-date") {
+			dateParts.push(`${name} = null`);
+		} else if (field.mode === "has-date") {
+			dateParts.push(`${name} != null`);
+		} else if (field.mode === "today") {
+			dateParts.push(`${name} = date(today)`);
+		} else if (field.mode === "tomorrow") {
+			dateParts.push(`${name} = date(tomorrow)`);
+		} else if (field.mode === "this-week") {
+			dateParts.push(`(${name} >= date(today) AND ${name} <= date(next-week))`);
+		} else if (field.mode === "overdue") {
+			dateParts.push(`${name} < date(today)`);
+		} else if (field.mode === "today-or-overdue") {
+			dateParts.push(`${name} <= date(today)`);
+		} else if (field.mode === "later") {
+			dateParts.push(`${name} > date(next-week)`);
+		}
+	};
+
+	if (filter.startDate) handleDateField(filter.startDate, "start");
+	if (filter.scheduledDate) handleDateField(filter.scheduledDate, "scheduled");
+	if (filter.dueDate) handleDateField(filter.dueDate, "due");
+
+	if (dateParts.length > 0) {
+		const rel = filter.dateFilterRelation || "or";
+		parts.push(`(${dateParts.join(` ${rel.toUpperCase()} `)})`);
+	}
+
+	// 5. Text search
+	if (filter.text && filter.text.trim() !== "") {
+		parts.push(`description contains "${filter.text.replace(/"/g, '\\"')}"`);
+	}
+
+	// 6. Tag filter
+	if (filter.tag && filter.tag.trim() !== "") {
+		parts.push(`tags contains "${filter.tag}"`);
+	}
+
+	return parts.join(" AND ");
+};
+
 export const alignTabColumns = (tabId: string, columns: ColumnConfig[]): ColumnConfig[] => {
 	const defaultKeys = tabId === "today" 
 		? ["overdue", "today"] 
@@ -924,6 +1091,8 @@ export const alignTabColumns = (tabId: string, columns: ColumnConfig[]): ColumnC
 		return {
 			id,
 			title,
+			queryMode: "gui",
+			query: getEnforcedColumnDQL(tabId, key),
 			filter: getEnforcedColumnFilter(id)
 		};
 	};
@@ -963,10 +1132,16 @@ export const alignTabColumns = (tabId: string, columns: ColumnConfig[]): ColumnC
 		}
 	}
 
-	// 3. Enforce latest filters and titles on all result columns
+	// 3. Enforce latest filters, titles and DQL queries on all result columns
 	for (const col of result) {
 		col.filter = getEnforcedColumnFilter(col.id);
 		const key = getColumnKey(col.id);
+		if (!col.queryMode) {
+			col.queryMode = "gui";
+		}
+		if (key && (!col.query || col.query.trim() === "")) {
+			col.query = getEnforcedColumnDQL(tabId, key);
+		}
 		if (key === "overdue") {
 			col.title = tabId === "today" ? (t("taskTodo.group.overdue") || "已过期") : (t("taskTodo.group.earlier") || "早前");
 		} else if (key === "today") {
@@ -988,16 +1163,24 @@ export const alignTabColumns = (tabId: string, columns: ColumnConfig[]): ColumnC
 class TabOrColumnModal extends Modal {
 	private result: {
 		title: string;
+		queryMode?: "gui" | "advanced";
+		query?: string;
 		filter: FilterConfig;
 	};
 
 	constructor(
 		app: App,
-		private initialData: { title: string; filter: FilterConfig },
-		private onSave: (data: { title: string; filter: FilterConfig }) => void
+		private initialData: { title: string; filter: FilterConfig; queryMode?: "gui" | "advanced"; query?: string },
+		private onSave: (data: { title: string; filter: FilterConfig; queryMode?: "gui" | "advanced"; query?: string }) => void
 	) {
 		super(app);
 		this.result = JSON.parse(JSON.stringify(initialData));
+		if (!this.result.queryMode) {
+			this.result.queryMode = "gui";
+		}
+		if (!this.result.filter) {
+			this.result.filter = createDefaultFilter();
+		}
 	}
 
 	onOpen() {
@@ -1007,6 +1190,7 @@ class TabOrColumnModal extends Modal {
 
 		this.setTitle(t("modal.editConfig"));
 
+		// Title Setting
 		new Setting(contentEl)
 			.setName(t("modal.name"))
 			.addText((text) =>
@@ -1017,6 +1201,189 @@ class TabOrColumnModal extends Modal {
 					})
 			);
 
+		// Tabs container
+		const tabsDiv = contentEl.createDiv({ cls: "tasktodo-modal-tabs" });
+		const btnGui = tabsDiv.createEl("button", {
+			cls: "tasktodo-modal-tab-btn",
+			text: "普通过滤"
+		});
+		const btnAdvanced = tabsDiv.createEl("button", {
+			cls: "tasktodo-modal-tab-btn",
+			text: "高级 DQL"
+		});
+
+		// Content containers
+		const contentGui = contentEl.createDiv({ cls: "tasktodo-modal-tab-content" });
+		const contentAdvanced = contentEl.createDiv({ cls: "tasktodo-modal-tab-content" });
+
+		// Tab switching logic
+		const setActiveTab = (mode: "gui" | "advanced") => {
+			this.result.queryMode = mode;
+			if (mode === "gui") {
+				btnGui.addClass("is-active");
+				btnAdvanced.removeClass("is-active");
+				contentGui.addClass("is-active");
+				contentAdvanced.removeClass("is-active");
+			} else {
+				btnGui.removeClass("is-active");
+				btnAdvanced.addClass("is-active");
+				contentGui.removeClass("is-active");
+				contentAdvanced.addClass("is-active");
+			}
+		};
+
+		btnGui.addEventListener("click", () => setActiveTab("gui"));
+		btnAdvanced.addEventListener("click", () => setActiveTab("advanced"));
+
+		// ------------------ GUI Tab Content ------------------
+		// Status Settings
+		new Setting(contentGui)
+			.setName("状态 (Completed)")
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOption("all", "不限")
+					.addOption("uncompleted", "未完成")
+					.addOption("completed", "已完成")
+					.setValue(this.result.filter.completed)
+					.onChange((val) => {
+						this.result.filter.completed = val as any;
+					});
+			});
+
+		new Setting(contentGui)
+			.setName("取消 (Cancelled)")
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOption("all", "不限")
+					.addOption("uncancelled", "未取消")
+					.addOption("cancelled", "已取消")
+					.setValue(this.result.filter.cancelled)
+					.onChange((val) => {
+						this.result.filter.cancelled = val as any;
+					});
+			});
+
+		// Priority (Checkboxes)
+		const prioritySetting = new Setting(contentGui)
+			.setName("重要性 (Priority)")
+			.setDesc("勾选以过滤特定优先级任务，均不勾选代表不限");
+		
+		const priorityContainer = prioritySetting.controlEl.createDiv({ cls: "tasktodo-priority-container" });
+		const priorities = [
+			{ key: "highest", label: "Highest ⏫" },
+			{ key: "high", label: "High 🔼" },
+			{ key: "medium", label: "Medium 🔽" },
+			{ key: "low", label: "Low 🔻" },
+			{ key: "lowest", label: "Lowest ⏬" },
+			{ key: "none", label: "None 无" },
+		];
+		
+		priorities.forEach((pri) => {
+			const wrapper = priorityContainer.createEl("label", { cls: "tasktodo-priority-label" });
+			const input = wrapper.createEl("input", { type: "checkbox" });
+			wrapper.createSpan({ text: pri.label });
+
+			const list = this.result.filter.priority || [];
+			input.checked = list.includes(pri.key);
+
+			input.addEventListener("change", () => {
+				const current = this.result.filter.priority || [];
+				if (input.checked) {
+					if (!current.includes(pri.key)) {
+						this.result.filter.priority = [...current, pri.key];
+					}
+				} else {
+					this.result.filter.priority = current.filter(k => k !== pri.key);
+				}
+			});
+		});
+
+		// Dates dropdowns: Start, Scheduled, Due date mode
+		const dateOptions = [
+			{ mode: "all", label: "不限 (All)" },
+			{ mode: "today", label: "今天 (Today)" },
+			{ mode: "tomorrow", label: "明天 (Tomorrow)" },
+			{ mode: "this-week", label: "本周 (This Week)" },
+			{ mode: "no-date", label: "无日期 (No Date)" },
+			{ mode: "overdue", label: "已逾期 (Overdue)" },
+			{ mode: "today-or-overdue", label: "今天或逾期 (Today/Overdue)" },
+			{ mode: "has-date", label: "有日期 (Has Date)" },
+			{ mode: "later", label: "以后 (Later)" },
+		];
+
+		const addDateDropdown = (name: string, field: DateFilterField) => {
+			new Setting(contentGui)
+				.setName(name)
+				.addDropdown((dropdown) => {
+					dateOptions.forEach(opt => dropdown.addOption(opt.mode, opt.label));
+					dropdown.setValue(field.mode || "all");
+					dropdown.onChange((val) => {
+						field.mode = val as any;
+					});
+				});
+		};
+
+		if (!this.result.filter.startDate) this.result.filter.startDate = { mode: "all" };
+		if (!this.result.filter.scheduledDate) this.result.filter.scheduledDate = { mode: "all" };
+		if (!this.result.filter.dueDate) this.result.filter.dueDate = { mode: "all" };
+
+		addDateDropdown("开始日期 (Start Date)", this.result.filter.startDate);
+		addDateDropdown("计划日期 (Scheduled Date)", this.result.filter.scheduledDate);
+		addDateDropdown("截止日期 (Due Date)", this.result.filter.dueDate);
+
+		// Date filter relation (AND / OR)
+		new Setting(contentGui)
+			.setName("多日期关联逻辑 (Relation)")
+			.addDropdown((dropdown) => {
+				dropdown
+					.addOption("or", "或 (OR) - 任一日期满足条件即可")
+					.addOption("and", "与 (AND) - 所有日期必须满足条件")
+					.setValue(this.result.filter.dateFilterRelation || "or")
+					.onChange((val) => {
+						this.result.filter.dateFilterRelation = val as any;
+					});
+			});
+
+		// Legacy tag/text filters (optional but good to have)
+		new Setting(contentGui)
+			.setName("文本包含 (Description contains)")
+			.addText((text) => {
+				text.setValue(this.result.filter.text || "")
+					.onChange((val) => {
+						this.result.filter.text = val;
+					});
+			});
+
+		new Setting(contentGui)
+			.setName("标签包含 (Tags contains)")
+			.addText((text) => {
+				text.setValue(this.result.filter.tag || "")
+					.onChange((val) => {
+						this.result.filter.tag = val;
+					});
+			});
+
+
+		// ------------------ Advanced Tab Content ------------------
+		contentAdvanced.createEl("div", {
+			text: "直接编辑过滤任务的 DQL 查询语句。支持 status, priority, due, scheduled, start, path, tags 等字段。",
+			attr: { style: "font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;" }
+		});
+
+		const textarea = contentAdvanced.createEl("textarea", {
+			cls: "tasktodo-advanced-textarea",
+			value: this.result.query || ""
+		});
+		textarea.placeholder = 'e.g. status = "TODO" AND due <= date(today)';
+		textarea.addEventListener("input", () => {
+			this.result.query = textarea.value;
+		});
+
+
+		// Set initial active tab
+		setActiveTab(this.result.queryMode || "gui");
+
+		// Save/Cancel Action Buttons
 		new Setting(contentEl)
 			.addButton((button) =>
 				button
@@ -1031,6 +1398,10 @@ class TabOrColumnModal extends Modal {
 						if (!this.result.title.trim()) {
 							new Notice("Title cannot be empty");
 							return;
+						}
+						// If in GUI mode, compile filter config to DQL query
+						if (this.result.queryMode === "gui") {
+							this.result.query = filterConfigToDQL(this.result.filter);
 						}
 						this.onSave(this.result);
 						this.close();

@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll } from "bun:test";
-import { matchFilter } from "../src/taskTodo/taskTodoFilter";
+import { matchFilter, preprocessDQLQuery, matchFilterWithDQL } from "../src/taskTodo/taskTodoFilter";
 import type { FilterConfig } from "../src/main";
 
 // Setup global mock for moment
@@ -260,5 +260,52 @@ describe("matchFilter", () => {
 		expect(matchFilter(overdueItem, filter)).toBe(true);
 		expect(matchFilter(todayItem, filter)).toBe(true);
 		expect(matchFilter(tomorrowItem, filter)).toBe(false);
+	});
+
+	describe("matchFilterWithDQL and preprocessDQLQuery", () => {
+		test("preprocessDQLQuery replaces tomorrow and next-week correctly", () => {
+			const query = 'status = "TODO" AND due = date(tomorrow) AND start = date(next-week)';
+			const preprocessed = preprocessDQLQuery(query);
+			expect(preprocessed).toContain('date("2026-06-02")');
+			expect(preprocessed).toContain('date("2026-06-08")');
+		});
+
+		test("matchFilterWithDQL uses DQL query if provided", () => {
+			const item = makeTestItem({
+				task: {
+					status: "TODO",
+					description: "task with DQL",
+					dates: { start: "2026-06-01", due: null, scheduled: null }
+				}
+			});
+			const hostMock = {
+				api: {
+					filterTasks: (records: any[], query: string) => {
+						if (query.includes('status = "TODO"') && query.includes('start = date("2026-06-01")')) {
+							return records;
+						}
+						return [];
+					}
+				}
+			};
+
+			const query = 'status = "TODO" AND start = date("2026-06-01")';
+			expect(matchFilterWithDQL(item, undefined, query, hostMock)).toBe(true);
+			expect(matchFilterWithDQL(item, undefined, 'status = "DONE"', hostMock)).toBe(false);
+		});
+
+		test("matchFilterWithDQL falls back to filter config if DQL query is missing", () => {
+			const item = makeTestItem({
+				task: {
+					status: "TODO",
+					description: "task with DQL",
+					dates: { start: "2026-06-01", due: null, scheduled: null }
+				}
+			});
+			const filter = makeFilter({
+				completed: "uncompleted"
+			});
+			expect(matchFilterWithDQL(item, filter, undefined, null)).toBe(true);
+		});
 	});
 });

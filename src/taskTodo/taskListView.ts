@@ -4,7 +4,7 @@ import { TASK_SYMBOLS, serializeTaskLine, type TaskTodoHost, type TaskTodoTaskLi
 import { compareTaskTodoItems } from "./taskTodoSort";
 import type TaskTodoPlugin from "../main";
 import type { FilterConfig, ColumnConfig } from "../main";
-import { matchFilter, type TaskListItem } from "./taskTodoFilter";
+import { matchFilterWithDQL, type TaskListItem } from "./taskTodoFilter";
 import { openTaskLineModal as openLocalTaskLineModal, openTaskLineModalWithTarget, type TaskLineModalResult, type TaskLiteSettings } from "./taskLineModal";
 import { fieldsFromTaskLine, type StatusRegistry } from "./taskLineFields";
 
@@ -91,14 +91,24 @@ export class TaskTodoTaskListView extends ItemView {
 		const tabs = this.plugin.settings.tabs.map(t => ({ id: t.id, title: t.title }));
 		const activeTabConfig = this.plugin.settings.tabs.find(t => t.id === this.activeTab) || this.plugin.settings.tabs[0];
 		
-		const visibleTasks = activeTabConfig ? tasks.filter(task => matchFilter(task, activeTabConfig.filter)) : [];
+		const visibleTasks = activeTabConfig ? tasks.filter(task => matchFilterWithDQL(task, activeTabConfig.filter, activeTabConfig.query, this.host)) : [];
 		this.renderHeader(layout, visibleTasks.length);
 		this.renderTabs(layout, tabs, visibleTasks);
 
 		if (activeTabConfig) {
+			let showCompleted = true;
+			if (activeTabConfig.queryMode === "advanced" && activeTabConfig.query) {
+				const q = activeTabConfig.query.toUpperCase();
+				if (q.includes('STATUS != "DONE"') || q.includes('STATUS = "TODO"') || q.includes('STATUS = "IN_PROGRESS"')) {
+					showCompleted = false;
+				}
+			} else if (activeTabConfig.filter && activeTabConfig.filter.completed === "uncompleted") {
+				showCompleted = false;
+			}
+
 			const columns = activeTabConfig.columns || [];
-			for (const group of groupTasksCustom(visibleTasks, columns, this.collapsedGroups)) {
-				this.renderGroup(layout, group, activeTabConfig.filter);
+			for (const group of groupTasksCustom(visibleTasks, columns, this.collapsedGroups, this.host)) {
+				this.renderGroup(layout, group, showCompleted);
 			}
 		}
 	}
@@ -158,7 +168,7 @@ export class TaskTodoTaskListView extends ItemView {
 		);
 	}
 
-	private renderGroup(container: HTMLElement, group: TaskGroup, filter: FilterConfig): void {
+	private renderGroup(container: HTMLElement, group: TaskGroup, showCompleted: boolean): void {
 		const section = container.createEl("section", {cls: "taskslite-list-section"});
 		const header = section.createDiv({cls: "taskslite-section-header"});
 		const chevron = header.createSpan({cls: "taskslite-section-chevron"});
@@ -175,11 +185,11 @@ export class TaskTodoTaskListView extends ItemView {
 		if (group.collapsed) return;
 		const list = section.createDiv({cls: "taskslite-task-list"});
 		for (const item of group.items) {
-			this.renderTaskItem(list, item, filter);
+			this.renderTaskItem(list, item, showCompleted);
 		}
 	}
 
-	private renderTaskItem(container: HTMLElement, item: TaskListItem, filter: FilterConfig): void {
+	private renderTaskItem(container: HTMLElement, item: TaskListItem, showCompleted: boolean): void {
 		const wrapper = container.createDiv({cls: "taskslite-list-item-wrapper"});
 		const row = wrapper.createDiv({cls: "taskslite-list-item"});
 		row.dataset.taskStatusType = item.task.status;
@@ -297,7 +307,7 @@ export class TaskTodoTaskListView extends ItemView {
 		});
 
 		if (item.hasChildren && this.expandedTasks.has(taskKey(item))) {
-			this.renderChildList(wrapper, item, filter);
+			this.renderChildList(wrapper, item, showCompleted);
 		}
 	}
 
@@ -342,18 +352,16 @@ export class TaskTodoTaskListView extends ItemView {
 		}
 	}
 
-	private renderChildList(container: HTMLElement, item: TaskListItem, filter: FilterConfig): void {
+	private renderChildList(container: HTMLElement, item: TaskListItem, showCompleted: boolean): void {
 		let children = item.children.filter((child) => isVisibleTask(child));
-		if (filter.completed === "uncompleted") {
+		if (!showCompleted) {
 			children = children.filter((child) => child.task.status !== "DONE");
-		} else if (filter.completed === "completed") {
-			children = children.filter((child) => child.task.status === "DONE");
 		}
 		if (children.length === 0) return;
 
 		const list = container.createDiv({cls: "taskslite-child-list"});
 		for (const child of children) {
-			this.renderTaskItem(list, child, filter);
+			this.renderTaskItem(list, child, showCompleted);
 		}
 	}
 
@@ -507,7 +515,8 @@ export class ConfirmModal extends Modal {
 function groupTasksCustom(
 	tasks: TaskListItem[],
 	columns: ColumnConfig[],
-	collapsedGroups: Set<string>
+	collapsedGroups: Set<string>,
+	host: any
 ): TaskGroup[] {
 	const buckets: TaskGroup[] = columns.map(col => ({
 		id: col.id,
@@ -519,7 +528,7 @@ function groupTasksCustom(
 	for (const task of tasks) {
 		for (let idx = 0; idx < columns.length; idx++) {
 			const col = columns[idx];
-			if (col && matchFilter(task, col.filter)) {
+			if (col && matchFilterWithDQL(task, col.filter, col.query, host)) {
 				const bucket = buckets[idx];
 				if (bucket) {
 					bucket.items.push(task);

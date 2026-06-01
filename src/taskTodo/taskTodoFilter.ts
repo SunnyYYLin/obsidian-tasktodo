@@ -154,3 +154,40 @@ function extractTags(description: string): string[] {
 	const tagRegex = /(^|\s)#[^ !@#$%^&*(),.?":{}|<>]+/g;
 	return Array.from(description.matchAll(tagRegex)).map((match) => match[0].trim());
 }
+
+export function preprocessDQLQuery(query: string): string {
+	if (!query) return query;
+	const today = todayString();
+	const tomorrow = (window as any).moment(today, "YYYY-MM-DD").add(1, "days").format("YYYY-MM-DD");
+	const nextWeek = (window as any).moment(today, "YYYY-MM-DD").add(7, "days").format("YYYY-MM-DD");
+
+	let result = query;
+	result = result.replace(/\bdate\(\s*["']?tomorrow["']?\s*\)/gi, `date("${tomorrow}")`);
+	result = result.replace(/\bdate\(\s*["']?next-week["']?\s*\)/gi, `date("${nextWeek}")`);
+	return result;
+}
+
+export function matchFilterWithDQL(
+	item: TaskListItem,
+	filter: FilterConfig | undefined,
+	query: string | undefined,
+	host: any
+): boolean {
+	if (query && query.trim() !== "") {
+		const preprocessed = preprocessDQLQuery(query);
+		if (host && host.api && typeof host.api.filterTasks === "function") {
+			const record = {
+				path: item.path,
+				basename: item.basename,
+				lineNumber: item.lineNumber,
+				parentLine: item.parentLine,
+				depth: item.depth,
+				hasChildren: item.hasChildren,
+				task: item.task,
+			};
+			const result = host.api.filterTasks([record], preprocessed);
+			return result.length > 0;
+		}
+	}
+	return filter ? matchFilter(item, filter) : true;
+}
