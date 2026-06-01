@@ -229,4 +229,36 @@ describe("matchFilter", () => {
 			startDate: { mode: "has-date" }
 		})).not.toBeNull(); // expect wrapper
 	});
+
+	test("today-or-overdue mode", () => {
+		const overdueItem = makeTestItem({
+			task: {
+				status: "TODO",
+				description: "task",
+				dates: { start: "2026-05-30", due: null, scheduled: null }
+			}
+		});
+		const todayItem = makeTestItem({
+			task: {
+				status: "TODO",
+				description: "task",
+				dates: { start: "2026-06-01", due: null, scheduled: null }
+			}
+		});
+		const tomorrowItem = makeTestItem({
+			task: {
+				status: "TODO",
+				description: "task",
+				dates: { start: "2026-06-02", due: null, scheduled: null }
+			}
+		});
+
+		const filter = makeFilter({
+			startDate: { mode: "today-or-overdue" as any }
+		});
+
+		expect(matchFilter(overdueItem, filter)).toBe(true);
+		expect(matchFilter(todayItem, filter)).toBe(true);
+		expect(matchFilter(tomorrowItem, filter)).toBe(false);
+	});
 });

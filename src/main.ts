@@ -7,7 +7,7 @@ import { type SortKey } from "./taskTodo/taskTodoSort";
 import { fieldsFromTaskLine, type StatusRegistry } from "./taskTodo/taskLineFields";
 
 export interface DateFilterField {
-	mode: "all" | "today" | "tomorrow" | "this-week" | "no-date" | "overdue" | "has-date" | "later" | "custom";
+	mode: "all" | "today" | "tomorrow" | "this-week" | "no-date" | "overdue" | "has-date" | "later" | "custom" | "today-or-overdue";
 	customStart?: string;
 	customEnd?: string;
 }
@@ -221,28 +221,7 @@ export default class TaskTodoPlugin extends Plugin {
 		} else {
 			for (const tab of this.settings.tabs) {
 				tab.filter = getEnforcedTabFilter(tab.id);
-				if (!tab.columns) {
-					tab.columns = [];
-				}
-				if (tab.columns.length === 0) {
-					if (tab.id === "today") {
-						tab.columns = createDefaultTodayColumns();
-					} else {
-						tab.columns = createDefaultInPlanColumns();
-					}
-				} else {
-					for (const col of tab.columns) {
-						col.filter = getEnforcedColumnFilter(col.id);
-						// Correct titles for overdue based on tab context
-						if (col.id.startsWith("overdue")) {
-							if (tab.id === "today") {
-								col.title = t("taskTodo.group.overdue") || "已过期";
-							} else {
-								col.title = t("taskTodo.group.earlier") || "早前";
-							}
-						}
-					}
-				}
+				tab.columns = alignTabColumns(tab.id, tab.columns || []);
 			}
 		}
 	}
@@ -788,9 +767,9 @@ export const getEnforcedTabFilter = (tabId: string): FilterConfig => {
 			text: "",
 			tag: "",
 			dateFilterRelation: "or",
-			startDate: { mode: "has-date" },
-			scheduledDate: { mode: "has-date" },
-			dueDate: { mode: "has-date" },
+			startDate: { mode: "all" },
+			scheduledDate: { mode: "all" },
+			dueDate: { mode: "all" },
 		};
 	}
 	if (tabId === "today") {
@@ -801,9 +780,9 @@ export const getEnforcedTabFilter = (tabId: string): FilterConfig => {
 			text: "",
 			tag: "",
 			dateFilterRelation: "or",
-			startDate: { mode: "today" },
-			scheduledDate: { mode: "today" },
-			dueDate: { mode: "today" },
+			startDate: { mode: "today-or-overdue" },
+			scheduledDate: { mode: "today-or-overdue" },
+			dueDate: { mode: "today-or-overdue" },
 		};
 	}
 	return {
@@ -909,6 +888,101 @@ export const getEnforcedColumnFilter = (colId: string): FilterConfig => {
 		scheduledDate: { mode: "all" },
 		dueDate: { mode: "all" },
 	};
+};
+
+export const getColumnKey = (colId: string): string | null => {
+	if (colId.startsWith("overdue")) return "overdue";
+	if (colId.startsWith("today")) return "today";
+	if (colId.startsWith("tomorrow")) return "tomorrow";
+	if (colId.startsWith("week") || colId.startsWith("this-week")) return "week";
+	if (colId.startsWith("later")) return "later";
+	if (colId.startsWith("no-date")) return "no-date";
+	return null;
+};
+
+export const alignTabColumns = (tabId: string, columns: ColumnConfig[]): ColumnConfig[] => {
+	const defaultKeys = tabId === "today" 
+		? ["overdue", "today"] 
+		: ["overdue", "today", "tomorrow", "week", "later", "no-date"];
+
+	const createDefaultCol = (key: string): ColumnConfig => {
+		const id = key + "_" + Math.random();
+		let title = "";
+		if (key === "overdue") {
+			title = tabId === "today" ? (t("taskTodo.group.overdue") || "已过期") : (t("taskTodo.group.earlier") || "早前");
+		} else if (key === "today") {
+			title = t("taskTodo.group.today") || "今天";
+		} else if (key === "tomorrow") {
+			title = t("taskTodo.group.tomorrow") || "明天";
+		} else if (key === "week") {
+			title = t("taskTodo.group.next7Days") || "本周";
+		} else if (key === "later") {
+			title = t("taskTodo.group.later") || "以后";
+		} else if (key === "no-date") {
+			title = t("taskTodo.group.noDate") || "无日期";
+		}
+		return {
+			id,
+			title,
+			filter: getEnforcedColumnFilter(id)
+		};
+	};
+
+	// 1. Keep only valid, non-duplicate columns
+	const seenKeys = new Set<string>();
+	const filtered: ColumnConfig[] = [];
+	for (const col of columns) {
+		const key = getColumnKey(col.id);
+		if (key && defaultKeys.includes(key) && !seenKeys.has(key)) {
+			seenKeys.add(key);
+			filtered.push(col);
+		}
+	}
+
+	// 2. Insert missing keys in their default relative positions
+	const result = [...filtered];
+	for (const key of defaultKeys) {
+		if (!seenKeys.has(key)) {
+			const newCol = createDefaultCol(key);
+			const afterKeyIndex = defaultKeys.indexOf(key);
+			let insertIdx = -1;
+			for (let i = afterKeyIndex + 1; i < defaultKeys.length; i++) {
+				const nextKey = defaultKeys[i];
+				const idx = result.findIndex(c => getColumnKey(c.id) === nextKey);
+				if (idx !== -1) {
+					insertIdx = idx;
+					break;
+				}
+			}
+			if (insertIdx !== -1) {
+				result.splice(insertIdx, 0, newCol);
+			} else {
+				result.push(newCol);
+			}
+			seenKeys.add(key);
+		}
+	}
+
+	// 3. Enforce latest filters and titles on all result columns
+	for (const col of result) {
+		col.filter = getEnforcedColumnFilter(col.id);
+		const key = getColumnKey(col.id);
+		if (key === "overdue") {
+			col.title = tabId === "today" ? (t("taskTodo.group.overdue") || "已过期") : (t("taskTodo.group.earlier") || "早前");
+		} else if (key === "today") {
+			col.title = t("taskTodo.group.today") || "今天";
+		} else if (key === "tomorrow") {
+			col.title = t("taskTodo.group.tomorrow") || "明天";
+		} else if (key === "week") {
+			col.title = t("taskTodo.group.next7Days") || "本周";
+		} else if (key === "later") {
+			col.title = t("taskTodo.group.later") || "以后";
+		} else if (key === "no-date") {
+			col.title = t("taskTodo.group.noDate") || "无日期";
+		}
+	}
+
+	return result;
 };
 
 class TabOrColumnModal extends Modal {

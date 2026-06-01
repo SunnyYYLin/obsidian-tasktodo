@@ -259,13 +259,30 @@ class TaskLineModal extends Modal {
 	}
 
 	private addStatusSetting(container: HTMLElement): void {
-		const settings = this.options.settings.statusSettings;
-		const statuses = [
-			...(settings?.coreStatuses || []),
-			...(settings?.customStatuses || []),
-		];
+		const registry = this.options.registry as any;
+		let statuses: Array<{ symbol: string; name: string }> = [];
 
-		if (statuses.length === 0) return;
+		if (registry && registry.bySymbol instanceof Map) {
+			statuses = Array.from(registry.bySymbol.values());
+		}
+
+		if (statuses.length === 0) {
+			const settings = this.options.settings?.statusSettings;
+			statuses = [
+				...(settings?.coreStatuses || []),
+				...(settings?.customStatuses || []),
+			];
+		}
+
+		if (statuses.length === 0) {
+			// Fallback to default core statuses
+			statuses = [
+				{ symbol: " ", name: "Todo" },
+				{ symbol: "x", name: "Done" },
+				{ symbol: "/", name: "In progress" },
+				{ symbol: "-", name: "Cancelled" },
+			];
+		}
 
 		new Setting(container)
 			.setName(t("modal.status"))
@@ -280,6 +297,7 @@ class TaskLineModal extends Modal {
 						hasCurrent = true;
 					}
 				}
+
 				if (!hasCurrent && this.fields.statusSymbol) {
 					dropdown.addOption(this.fields.statusSymbol, `[${this.fields.statusSymbol}]`);
 				}

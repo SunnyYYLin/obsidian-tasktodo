@@ -126,6 +126,8 @@ function matchDateField(dateString: string | null, field: DateFilterField, today
 	switch (field.mode) {
 		case "today":
 			return dateString === today;
+		case "today-or-overdue":
+			return dateString <= today;
 		case "tomorrow":
 			return dateString === shiftDate(today, 1);
 		case "this-week": {
