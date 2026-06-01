@@ -157,10 +157,10 @@ export default class TaskTodoPlugin extends Plugin {
 		const data = await this.loadData();
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
 
-		const createDefaultColumns = (): ColumnConfig[] => [
+		const createDefaultInPlanColumns = (): ColumnConfig[] => [
 			{
 				id: "overdue_" + Math.random(),
-				title: t("taskTodo.group.overdue") || "已过期",
+				title: t("taskTodo.group.earlier") || "早前",
 				filter: getEnforcedColumnFilter("overdue")
 			},
 			{
@@ -190,19 +190,32 @@ export default class TaskTodoPlugin extends Plugin {
 			}
 		];
 
+		const createDefaultTodayColumns = (): ColumnConfig[] => [
+			{
+				id: "overdue_" + Math.random(),
+				title: t("taskTodo.group.overdue") || "已过期",
+				filter: getEnforcedColumnFilter("overdue")
+			},
+			{
+				id: "today_" + Math.random(),
+				title: t("taskTodo.group.today") || "今天",
+				filter: getEnforcedColumnFilter("today")
+			}
+		];
+
 		if (!this.settings.tabs || this.settings.tabs.length === 0) {
 			this.settings.tabs = [
 				{
 					id: "in-plan",
 					title: t("taskTodo.tab.inPlan"),
 					filter: getEnforcedTabFilter("in-plan"),
-					columns: createDefaultColumns()
+					columns: createDefaultInPlanColumns()
 				},
 				{
 					id: "today",
 					title: t("taskTodo.tab.today"),
 					filter: getEnforcedTabFilter("today"),
-					columns: createDefaultColumns()
+					columns: createDefaultTodayColumns()
 				}
 			];
 		} else {
@@ -212,10 +225,22 @@ export default class TaskTodoPlugin extends Plugin {
 					tab.columns = [];
 				}
 				if (tab.columns.length === 0) {
-					tab.columns = createDefaultColumns();
+					if (tab.id === "today") {
+						tab.columns = createDefaultTodayColumns();
+					} else {
+						tab.columns = createDefaultInPlanColumns();
+					}
 				} else {
 					for (const col of tab.columns) {
 						col.filter = getEnforcedColumnFilter(col.id);
+						// Correct titles for overdue based on tab context
+						if (col.id.startsWith("overdue")) {
+							if (tab.id === "today") {
+								col.title = t("taskTodo.group.overdue") || "已过期";
+							} else {
+								col.title = t("taskTodo.group.earlier") || "早前";
+							}
+						}
 					}
 				}
 			}
@@ -229,6 +254,13 @@ export default class TaskTodoPlugin extends Plugin {
 				if (tab.columns) {
 					for (const col of tab.columns) {
 						col.filter = getEnforcedColumnFilter(col.id);
+						if (col.id.startsWith("overdue")) {
+							if (tab.id === "today") {
+								col.title = t("taskTodo.group.overdue") || "已过期";
+							} else {
+								col.title = t("taskTodo.group.earlier") || "早前";
+							}
+						}
 					}
 				}
 			}
