@@ -41,6 +41,10 @@ bun test <name>      # 运行单个测试文件
 - 代码注释和文档使用中文
 - TypeScript 严格模式（strictNullChecks、noImplicitAny 等），`baseUrl` 设为 `src`
 
+### 版本更新与发布约束
+
+- **每次更新版本要发布一个 pre-release**：当代码更改且需要发版时，必须修改版本号（如 `0.2.1-alpha.0` -> `0.2.1-alpha.1`），同步更新 `package.json`、`manifest.json` 和 `versions.json`，运行 `bun run build`，提交推送代码，打上对应的 git tag（如 `v0.2.1-alpha.1`）并推送，最后使用 GitHub CLI 创建 pre-release 并上传构建好的 `main.js`、`manifest.json`、`styles.css` 文件。
+
 ### 禁止直接读写笔记文件内容
 
 **本插件不得直接读写 vault 文件内容（`app.vault.read/cachedRead/modify/create/delete`、`editor.replaceRange` 等），所有任务数据的增删改均必须通过 TaskLite Core API（`host.api.*`）进行，无任何例外。**
