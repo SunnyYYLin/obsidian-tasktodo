@@ -1265,9 +1265,9 @@ class TabOrColumnModal extends Modal {
 		});
 
 		const textarea = contentAdvanced.createEl("textarea", {
-			cls: "tasktodo-advanced-textarea",
-			value: this.result.query || ""
+			cls: "tasktodo-advanced-textarea"
 		});
+		textarea.value = this.result.query || "";
 		textarea.placeholder = 'e.g. status = "TODO" AND due <= date(today)';
 		textarea.addEventListener("input", () => {
 			this.result.query = textarea.value;
