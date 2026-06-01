@@ -3,25 +3,12 @@ import { t } from "../i18n";
 import { TASK_SYMBOLS, serializeTaskLine, todayString, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord, type EditTaskPatch, type CreateTaskInput } from "../taskLiteInterop";
 import { compareTaskTodoItems } from "./taskTodoSort";
 import type TaskTodoPlugin from "../main";
-import type { FilterConfig, TabConfig, ColumnConfig } from "../main";
+import type { FilterConfig, TabConfig, ColumnConfig, DateFilterField } from "../main";
+import { matchFilter, type TaskListItem } from "./taskTodoFilter";
 import { openTaskLineModal as openLocalTaskLineModal, openTaskLineModalWithTarget, type TaskLineModalResult, type TaskLiteSettings } from "./taskLineModal";
 import { fieldsFromTaskLine, type StatusRegistry } from "./taskLineFields";
 
 export const TASKTODO_VIEW = "tasktodo-task-list";
-
-interface TaskListItem {
-	path: string;
-	basename: string;
-	lineNumber: number;
-	parentLine: number | null;
-	depth: number;
-	hasChildren: boolean;
-	task: TaskTodoTaskLine;
-	date: string | null;
-	dateType: "due" | "scheduled" | "start" | null;
-	parent: TaskListItem | null;
-	children: TaskListItem[];
-}
 
 interface TaskGroup {
 	id: string;
@@ -109,7 +96,7 @@ export class TaskTodoTaskListView extends ItemView {
 		this.renderTabs(layout, tabs, visibleTasks);
 
 		if (activeTabConfig) {
-			const columns = this.plugin.settings.columns;
+			const columns = activeTabConfig.columns || [];
 			for (const group of groupTasksCustom(visibleTasks, columns, this.collapsedGroups)) {
 				this.renderGroup(layout, group, activeTabConfig.filter);
 			}
@@ -518,58 +505,7 @@ export class ConfirmModal extends Modal {
 	}
 }
 
-function matchFilter(item: TaskListItem, filter: FilterConfig): boolean {
-	if (filter.completed === "completed" && item.task.status.type !== "DONE") {
-		return false;
-	}
-	if (filter.completed === "uncompleted" && item.task.status.type === "DONE") {
-		return false;
-	}
 
-	const today = todayString();
-	const { start, due, scheduled } = item.task.metadata.dates;
-
-	switch (filter.dates) {
-		case "today":
-			if (scheduled === today || due === today) return true;
-			if ((scheduled && scheduled < today) || (due && due < today)) return true;
-			if (start && due && start <= today && today <= due) return true;
-			return false;
-		case "tomorrow": {
-			const tomorrow = shiftDate(today, 1);
-			return scheduled === tomorrow || due === tomorrow;
-		}
-		case "this-week": {
-			const tomorrow = shiftDate(today, 1);
-			const nextWeek = shiftDate(today, 7);
-			const d = scheduled || due;
-			if (!d) return false;
-			return d >= tomorrow && d <= nextWeek;
-		}
-		case "overdue":
-			return Boolean((scheduled && scheduled < today) || (due && due < today));
-		case "later": {
-			const nextWeek = shiftDate(today, 7);
-			const d = scheduled || due;
-			if (!d) return false;
-			return d > nextWeek;
-		}
-		case "no-date":
-			return !scheduled && !due && !start;
-		case "has-date":
-			return scheduled !== null || due !== null;
-		case "custom": {
-			const d = scheduled || due;
-			if (!d) return false;
-			if (filter.customDateStart && d < filter.customDateStart) return false;
-			if (filter.customDateEnd && d > filter.customDateEnd) return false;
-			return true;
-		}
-		case "all":
-		default:
-			return true;
-	}
-}
 
 function groupTasksCustom(
 	tasks: TaskListItem[],
@@ -662,13 +598,7 @@ function taskKey(item: Pick<TaskListItem, "path" | "lineNumber">): string {
 	return `${item.path}:${item.lineNumber}`;
 }
 
-function shiftDate(value: string, amount: number): string {
-	const [year, month, day] = value.split("-").map((part) => Number.parseInt(part, 10));
-	if (year === undefined || month === undefined || day === undefined) return value;
-	const date = new Date(Date.UTC(year, (month ?? 1) - 1, day ?? 1));
-	date.setUTCDate(date.getUTCDate() + amount);
-	return `${date.getUTCFullYear().toString().padStart(4, "0")}-${(date.getUTCMonth() + 1).toString().padStart(2, "0")}-${date.getUTCDate().toString().padStart(2, "0")}`;
-}
+
 
 function applyTaskStatusIcon(container: HTMLElement, statusType: string): void {
 	container.empty();
