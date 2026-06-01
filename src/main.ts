@@ -913,12 +913,12 @@ class TabOrColumnModal extends Modal {
 			);
 
 		new Setting(contentEl)
-			.setName(t("settings.sortKey.cancelled") || "过滤已取消")
+			.setName(t("taskTodo.filterCancelled"))
 			.addDropdown((dropdown) =>
 				dropdown
 					.addOption("all", t("taskTodo.datesFilter.all"))
-					.addOption("uncancelled", t("task.action.uncancel") || "未取消")
-					.addOption("cancelled", t("task.action.cancel") || "已取消")
+					.addOption("uncancelled", t("taskTodo.status.uncancelled"))
+					.addOption("cancelled", t("taskTodo.status.cancelled"))
 					.setValue(this.result.filter.cancelled)
 					.onChange((val) => {
 						this.result.filter.cancelled = val as any;
@@ -926,22 +926,22 @@ class TabOrColumnModal extends Modal {
 			);
 
 		new Setting(contentEl)
-			.setName(t("modal.taskNamePlaceholder") || "描述匹配")
+			.setName(t("taskTodo.filterText.name"))
 			.addText((text) =>
 				text
 					.setValue(this.result.filter.text || "")
-					.setPlaceholder(t("modal.taskNamePlaceholder") || "搜索描述/人物")
+					.setPlaceholder(t("taskTodo.filterText.placeholder"))
 					.onChange((val) => {
 						this.result.filter.text = val;
 					})
 			);
 
 		new Setting(contentEl)
-			.setName("标签匹配")
+			.setName(t("taskTodo.filterTag.name"))
 			.addText((text) =>
 				text
 					.setValue(this.result.filter.tag || "")
-					.setPlaceholder("#work")
+					.setPlaceholder(t("taskTodo.filterTag.placeholder"))
 					.onChange((val) => {
 						this.result.filter.tag = val;
 					})
@@ -975,11 +975,11 @@ class TabOrColumnModal extends Modal {
 		});
 
 		new Setting(contentEl)
-			.setName("日期筛选关系")
+			.setName(t("taskTodo.dateRelation.name"))
 			.addDropdown((dropdown) =>
 				dropdown
-					.addOption("or", "满足任一非空日期条件 (OR)")
-					.addOption("and", "同时满足所有非空日期条件 (AND)")
+					.addOption("or", t("taskTodo.dateRelation.or"))
+					.addOption("and", t("taskTodo.dateRelation.and"))
 					.setValue(this.result.filter.dateFilterRelation || "or")
 					.onChange((val) => {
 						this.result.filter.dateFilterRelation = val as any;
