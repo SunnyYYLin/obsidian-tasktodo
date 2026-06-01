@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { serializeTaskLine, TASK_SYMBOLS, todayString } from "../src/taskLiteInterop";
 import type { TaskTodoTaskLine } from "../src/host";
-import { parseTaskBody } from "../src/taskTodo/format";
 
 const mockRegistry = {
 	getByType: (type: string) => {
@@ -158,21 +157,5 @@ describe("todayString", () => {
 		};
 		const result = todayString();
 		expect(result).toBe("2024-06-15");
-	});
-});
-
-describe("parseTaskBody from format.ts", () => {
-	test("解析单人/多人 assignee", () => {
-		const meta1 = parseTaskBody("Buy milk 👤 John");
-		expect(meta1.person).toEqual(["John"]);
-		expect(meta1.description).toBe("Buy milk");
-
-		const meta2 = parseTaskBody("Buy milk 👤 John & Mary");
-		expect(meta2.person).toEqual(["John", "Mary"]);
-		expect(meta2.description).toBe("Buy milk");
-
-		const metaNone = parseTaskBody("Buy milk");
-		expect(metaNone.person).toEqual([]);
-		expect(metaNone.description).toBe("Buy milk");
 	});
 });

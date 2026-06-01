@@ -1,12 +1,10 @@
-import { ItemView, Menu, Modal, Notice, setIcon, TFile, type App, type WorkspaceLeaf } from "obsidian";
+import { ItemView, Menu, Modal, setIcon, TFile, type App, type WorkspaceLeaf } from "obsidian";
 import { t } from "../i18n";
-import { TASK_SYMBOLS, serializeTaskLine, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord, type EditTaskPatch, type CreateTaskInput } from "../taskLiteInterop";
+import { TASK_SYMBOLS, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord } from "../taskLiteInterop";
 import { compareTaskTodoItems } from "./taskTodoSort";
 import type TaskTodoPlugin from "../main";
-import type { FilterConfig, ColumnConfig } from "../main";
+import type { ColumnConfig } from "../main";
 import { matchFilterWithDQL, type TaskListItem } from "./taskTodoFilter";
-import { openTaskLineModal as openLocalTaskLineModal, openTaskLineModalWithTarget, type TaskLineModalResult, type TaskLiteSettings } from "./taskLineModal";
-import { fieldsFromTaskLine, type StatusRegistry } from "./taskLineFields";
 
 export const TASKTODO_VIEW = "tasktodo-task-list";
 
@@ -131,14 +129,6 @@ export class TaskTodoTaskListView extends ItemView {
 		refreshButton.addEventListener("click", () => {
 			void this.render();
 		});
-
-		const addButton = actions.createEl("button", {cls: "taskslite-add-task", attr: {"aria-label": t("taskTodo.addTask")}});
-		const addIcon = addButton.createSpan();
-		setIcon(addIcon, "plus");
-		addButton.createSpan({text: t("taskTodo.addTask")});
-		addButton.addEventListener("click", () => {
-			void this.createInboxTask();
-		});
 	}
 
 	private renderTabs(container: HTMLElement, tabs: TaskListTab[], tasks: TaskListItem[]): void {
@@ -213,11 +203,11 @@ export class TaskTodoTaskListView extends ItemView {
 		this.renderItemTitle(body, item);
 		this.renderItemMeta(body, item);
 
-		row.addEventListener("click", async () => {
+		row.addEventListener("click", () => {
 			const file = this.appRef.vault.getAbstractFileByPath(item.path);
 			if (file instanceof TFile) {
 				const leaf = this.appRef.workspace.getLeaf(false);
-				await leaf.openFile(file, {
+				void leaf.openFile(file, {
 					eState: { line: item.lineNumber }
 				});
 			}
@@ -228,26 +218,6 @@ export class TaskTodoTaskListView extends ItemView {
 			event.stopPropagation();
 			
 			const menu = new Menu();
-
-			// 1. 添加子任务 (Add subtask)
-			menu.addItem((menuItem) => {
-				menuItem
-					.setTitle(t("task.action.addSubtask"))
-					.setIcon("list-plus")
-					.onClick(() => {
-						void this.createSubtask(item);
-					});
-			});
-
-			// 2. 编辑 (Edit)
-			menu.addItem((menuItem) => {
-				menuItem
-					.setTitle(t("task.action.edit"))
-					.setIcon("pencil")
-					.onClick(() => {
-						void this.editTask(item);
-					});
-			});
 
 			// 3. 进行中 (In progress)
 			const isInProgress = item.task.status === "IN_PROGRESS";
@@ -295,9 +265,11 @@ export class TaskTodoTaskListView extends ItemView {
 							this.appRef,
 							t("task.action.deleteConfirmTitle"),
 							t("task.action.deleteConfirmMessage").replace("{description}", item.task.description),
-							async () => {
-								await this.host.api.deleteTask(item.path, item.lineNumber);
-								await this.render();
+							() => {
+								void (async () => {
+									await this.host.api.deleteTask(item.path, item.lineNumber);
+									await this.render();
+								})();
 							}
 						).open();
 					});
@@ -365,35 +337,6 @@ export class TaskTodoTaskListView extends ItemView {
 		}
 	}
 
-	private async editTask(item: TaskListItem): Promise<void> {
-		const currentLine = serializeTaskLine(item.task, this.host.statusRegistry);
-		const updatedLine = await openTaskLineModal(this.host, this.appRef, currentLine, t("command.editTask"));
-		if (!updatedLine || updatedLine === currentLine) return;
-
-		const fields = fieldsFromTaskLine(updatedLine, this.host.statusRegistry as unknown as StatusRegistry);
-		const patch: EditTaskPatch = {
-			description: fields.description,
-			priority: fields.priority || null,
-			dates: {
-				start: fields.start || null,
-				scheduled: fields.scheduled || null,
-				due: fields.due || null,
-			},
-			recurrence: fields.recurrence || null,
-			onCompletion: fields.onCompletion || null,
-			id: fields.id || null,
-			dependsOn: fields.dependsOn || null,
-		};
-
-		await this.host.api.editTask(item.path, item.lineNumber, patch);
-
-		const currentSymbol = this.host.statusRegistry.getByType(item.task.status).symbol;
-		if (fields.statusSymbol !== currentSymbol) {
-			await this.host.api.updateTaskStatus(item.path, item.lineNumber, fields.statusSymbol);
-		}
-
-		await this.render();
-	}
 
 	private toggleTaskExpanded(item: TaskListItem): void {
 		const key = taskKey(item);
@@ -413,63 +356,6 @@ export class TaskTodoTaskListView extends ItemView {
 		return items.sort((a, b) => compareTaskTodoItems(a, b, sortKeys));
 	}
 
-	private async createInboxTask(): Promise<void> {
-		const result = await openTaskLineModalWithTargetHelper(this.host, this.appRef, "", t("taskTodo.createTask"), {
-			basePath: "",
-			defaultValue: "Tasks",
-		});
-		if (!result || !result.line) return;
-		const fields = fieldsFromTaskLine(result.line, this.host.statusRegistry as unknown as StatusRegistry);
-		const input: CreateTaskInput = {
-			description: fields.description,
-			priority: fields.priority || null,
-			dates: {
-				start: fields.start || null,
-				scheduled: fields.scheduled || null,
-				due: fields.due || null,
-			},
-			recurrence: fields.recurrence || null,
-			onCompletion: fields.onCompletion || null,
-			id: fields.id || null,
-			dependsOn: fields.dependsOn || null,
-			path: result.targetPath || "Tasks.md",
-		};
-		try {
-			await this.host.api.createTask(input);
-		} catch (error) {
-			new Notice(t("notice.inboxPathFolder"));
-			console.warn("TaskTodo failed to create inbox task", error);
-		}
-		await this.render();
-	}
-
-	private async createSubtask(parent: TaskListItem): Promise<void> {
-		const line = await openTaskLineModal(this.host, this.appRef, "", t("taskTodo.createTask"));
-		if (!line) return;
-		const fields = fieldsFromTaskLine(line, this.host.statusRegistry as unknown as StatusRegistry);
-		const input: CreateTaskInput = {
-			description: fields.description,
-			priority: fields.priority || null,
-			dates: {
-				start: fields.start || null,
-				scheduled: fields.scheduled || null,
-				due: fields.due || null,
-			},
-			recurrence: fields.recurrence || null,
-			onCompletion: fields.onCompletion || null,
-			id: fields.id || null,
-			dependsOn: fields.dependsOn || null,
-			path: parent.path,
-			parentLineNumber: parent.lineNumber,
-		};
-		try {
-			await this.host.api.createTask(input);
-		} catch (error) {
-			new Notice(t("notice.inboxPathFolder"));
-			console.warn("TaskTodo failed to create subtask", error);
-		}
-		await this.render();
-	}
 }
 
 export class ConfirmModal extends Modal {
@@ -516,7 +402,7 @@ function groupTasksCustom(
 	tasks: TaskListItem[],
 	columns: ColumnConfig[],
 	collapsedGroups: Set<string>,
-	host: any
+	host: TaskTodoHost
 ): TaskGroup[] {
 	const buckets: TaskGroup[] = columns.map(col => ({
 		id: col.id,
@@ -622,29 +508,3 @@ function applyTaskStatusIcon(container: HTMLElement, statusType: string): void {
 	}
 }
 
-function openTaskLineModal(host: TaskTodoHost, app: App, initialLine: string, title: string): Promise<string> {
-	return openLocalTaskLineModal({
-		app,
-		title,
-		initialLine,
-		registry: host.statusRegistry as unknown as StatusRegistry,
-		settings: host.settings as unknown as TaskLiteSettings,
-	});
-}
-
-function openTaskLineModalWithTargetHelper(
-	host: TaskTodoHost,
-	app: App,
-	initialLine: string,
-	title: string,
-	targetFile: { basePath: string; defaultValue: string }
-): Promise<TaskLineModalResult | null> {
-	return openTaskLineModalWithTarget({
-		app,
-		title,
-		initialLine,
-		registry: host.statusRegistry as unknown as StatusRegistry,
-		settings: host.settings as unknown as TaskLiteSettings,
-		targetFile,
-	});
-}

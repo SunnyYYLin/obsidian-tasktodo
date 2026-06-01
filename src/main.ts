@@ -1,10 +1,8 @@
-import { Notice, Plugin, PluginSettingTab, Setting, Editor, MarkdownView, TFile, App, Modal } from "obsidian";
+import { Notice, Plugin, PluginSettingTab, Setting, App, Modal } from "obsidian";
 import { t, type I18nKey } from "./i18n";
-import { getTaskLiteHost, type TaskTodoHost, type CreateTaskInput } from "./host";
+import { getTaskLiteHost, type TaskTodoHost } from "./host";
 import { TASKTODO_VIEW, TaskTodoTaskListView } from "./taskTodo/taskListView";
-import { openTaskLineModal, openTaskLineModalWithTarget, type TaskLineModalResult } from "./taskTodo/taskLineModal";
 import { type SortKey } from "./taskTodo/taskTodoSort";
-import { fieldsFromTaskLine, type StatusRegistry } from "./taskTodo/taskLineFields";
 
 export interface DateFilterField {
 	mode: "all" | "today" | "tomorrow" | "this-week" | "no-date" | "overdue" | "has-date" | "later" | "custom" | "today-or-overdue";
@@ -60,8 +58,6 @@ export const DEFAULT_SETTINGS: TaskTodoSettings = {
 export default class TaskTodoPlugin extends Plugin {
 	private host: TaskTodoHost | null = null;
 	settings!: TaskTodoSettings;
-	private originalTasksApi: unknown = null;
-
 	async onload(): Promise<void> {
 		this.host = getTaskLiteHost(this.app);
 		if (!this.host) {
@@ -70,32 +66,6 @@ export default class TaskTodoPlugin extends Plugin {
 		}
 
 		await this.loadSettings();
-
-		this.originalTasksApi = (window as any).TasksPluginApi;
-		(window as any).TasksPluginApi = {
-			getApi: (version: string) => {
-				if (version !== "v1") return undefined;
-				return {
-					isTasksPluginEnabled: () => true,
-					createTaskLineModal: () => {
-						return this.openTaskLineModal({
-							title: t("command.createTask"),
-							initialLine: "",
-						});
-					},
-					editTaskLineModal: (taskLine: string) => {
-						return this.openTaskLineModal({
-							title: t("command.editTask"),
-							initialLine: taskLine,
-						});
-					},
-					executeToggleTaskDoneCommand: (line: string, path: string) => {
-						if (!this.host) return line;
-						return this.host.api.executeTasksToggleCommand(line, path);
-					},
-				};
-			},
-		};
 
 		this.registerView(TASKTODO_VIEW, (leaf) => new TaskTodoTaskListView(leaf, this.app, this.host!, this));
 		this.addRibbonIcon("list-todo", t("command.openTaskTodo"), () => {
@@ -106,45 +76,6 @@ export default class TaskTodoPlugin extends Plugin {
 			name: t("command.openTaskList"),
 			callback: () => {
 				void this.activateTaskTodoView();
-			},
-		});
-
-		this.addCommand({
-			id: "create-task",
-			name: t("command.createTask"),
-			editorCheckCallback: (checking: boolean, editor: Editor, view) => {
-				if (!(view instanceof MarkdownView)) return false;
-				if (checking) return true;
-				const file = view.file;
-				if (!file) return false;
-				void this.createTaskInEditor(editor, file);
-				return true;
-			},
-		});
-
-		this.addCommand({
-			id: "edit-task",
-			name: t("command.editTask"),
-			editorCheckCallback: (checking: boolean, editor: Editor, view) => {
-				if (!(view instanceof MarkdownView)) return false;
-				if (checking) return true;
-				const file = view.file;
-				if (!file) return false;
-				void this.editTaskInEditor(editor, file);
-				return true;
-			},
-		});
-
-		this.addCommand({
-			id: "create-or-edit-task",
-			name: t("command.createOrEditTask"),
-			editorCheckCallback: (checking: boolean, editor: Editor, view) => {
-				if (!(view instanceof MarkdownView)) return false;
-				if (checking) return true;
-				const file = view.file;
-				if (!file) return false;
-				void this.createOrEditTaskInEditor(editor, file);
-				return true;
 			},
 		});
 
@@ -300,153 +231,7 @@ export default class TaskTodoPlugin extends Plugin {
 		}
 	}
 
-	openTaskLineModal(options: {title: string; initialLine: string}): Promise<string> {
-		if (!this.host) return Promise.resolve(options.initialLine);
-		return openTaskLineModal({
-			app: this.app,
-			title: options.title,
-			initialLine: options.initialLine,
-			registry: this.host.statusRegistry as any,
-			settings: this.host.settings as any,
-		});
-	}
-
-	openTaskLineModalWithTarget(options: {
-		title: string;
-		initialLine: string;
-		targetFile: {basePath: string; defaultValue: string};
-		parentTask?: {
-			options: Array<{label: string; path: string; lineNumber: number}>;
-			initialValue?: {path: string; lineNumber: number};
-		};
-	}): Promise<TaskLineModalResult | null> {
-		if (!this.host) return Promise.resolve(null);
-		return openTaskLineModalWithTarget({
-			app: this.app,
-			title: options.title,
-			initialLine: options.initialLine,
-			registry: this.host.statusRegistry as any,
-			settings: this.host.settings as any,
-			targetFile: options.targetFile,
-			parentTask: options.parentTask,
-		});
-	}
-
-	private async createTaskInEditor(editor: Editor, currentFile: TFile): Promise<void> {
-		if (!this.host) return;
-		const result = await openTaskLineModalWithTarget({
-			app: this.app,
-			title: t("command.createTask"),
-			initialLine: "",
-			registry: this.host.statusRegistry as any,
-			settings: this.host.settings as any,
-			targetFile: {basePath: currentFile.parent?.path ?? "", defaultValue: currentFile.basename},
-		});
-		if (!result?.line) return;
-
-		const targetPath = result.targetPath ?? currentFile.path;
-		if (targetPath !== currentFile.path) {
-			// 写入其他文件时，通过 TaskLite API 创建任务，避免直接操作 vault
-			const fields = fieldsFromTaskLine(result.line, this.host.statusRegistry as unknown as StatusRegistry);
-			const input: CreateTaskInput = {
-				description: fields.description,
-				priority: fields.priority || null,
-				dates: {
-					start: fields.start || null,
-					scheduled: fields.scheduled || null,
-					due: fields.due || null,
-				},
-				recurrence: fields.recurrence || null,
-				onCompletion: fields.onCompletion || null,
-				id: fields.id || null,
-				dependsOn: fields.dependsOn || null,
-				path: targetPath,
-			};
-			try {
-				await this.host.api.createTask(input);
-			} catch (error) {
-				new Notice(t("notice.inboxPathFolder"));
-				console.warn("TaskTodo failed to create task in target file", error);
-			}
-			return;
-		}
-
-		// 目标是当前文件：通过 TaskLite API 创建，追加到文件末尾
-		const fields = fieldsFromTaskLine(result.line, this.host.statusRegistry as unknown as StatusRegistry);
-		const input: CreateTaskInput = {
-			description: fields.description,
-			priority: fields.priority || null,
-			dates: {
-				start: fields.start || null,
-				scheduled: fields.scheduled || null,
-				due: fields.due || null,
-			},
-			recurrence: fields.recurrence || null,
-			onCompletion: fields.onCompletion || null,
-			id: fields.id || null,
-			dependsOn: fields.dependsOn || null,
-			path: currentFile.path,
-		};
-		try {
-			await this.host.api.createTask(input);
-		} catch (error) {
-			new Notice(t("notice.inboxPathFolder"));
-			console.warn("TaskTodo failed to create task in current file", error);
-		}
-	}
-
-	private async editTaskInEditor(editor: Editor, file: TFile): Promise<void> {
-		if (!this.host) return;
-		const cursor = editor.getCursor();
-		const currentLine = editor.getLine(cursor.line);
-		const newLine = await openTaskLineModal({
-			app: this.app,
-			title: t("command.editTask"),
-			initialLine: currentLine,
-			registry: this.host.statusRegistry as any,
-			settings: this.host.settings as any,
-		});
-		if (!newLine || newLine === currentLine) return;
-
-		const registry = this.host.statusRegistry as unknown as StatusRegistry;
-		const oldFields = fieldsFromTaskLine(currentLine, registry);
-		const newFields = fieldsFromTaskLine(newLine, registry);
-
-		// 通过 TaskLite API 更新元数据字段
-		await this.host.api.editTask(file.path, cursor.line, {
-			description: newFields.description,
-			priority: newFields.priority || null,
-			dates: {
-				start: newFields.start || null,
-				scheduled: newFields.scheduled || null,
-				due: newFields.due || null,
-			},
-			recurrence: newFields.recurrence || null,
-			onCompletion: newFields.onCompletion || null,
-			id: newFields.id || null,
-			dependsOn: newFields.dependsOn || null,
-		});
-
-		// 状态变更通过专用 API 处理（editTask 不涉及状态）
-		if (newFields.statusSymbol !== oldFields.statusSymbol) {
-			await this.host.api.updateTaskStatus(file.path, cursor.line, newFields.statusSymbol);
-		}
-	}
-
-	private async createOrEditTaskInEditor(editor: Editor, file: TFile): Promise<void> {
-		const cursor = editor.getCursor();
-		const currentLine = editor.getLine(cursor.line);
-		if (currentLine.trim() === "") {
-			await this.createTaskInEditor(editor, file);
-			return;
-		}
-		await this.editTaskInEditor(editor, file);
-	}
-
 	onunload(): void {
-		if (this.originalTasksApi !== undefined) {
-			(window as any).TasksPluginApi = this.originalTasksApi;
-		}
 	}
 }
 
