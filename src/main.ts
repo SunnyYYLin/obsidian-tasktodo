@@ -782,7 +782,7 @@ export const createDefaultFilter = (): FilterConfig => ({
 export const getEnforcedTabFilter = (tabId: string): FilterConfig => {
 	if (tabId === "in-plan") {
 		return {
-			completed: "uncompleted",
+			completed: "all",
 			cancelled: "uncancelled",
 			priority: [],
 			text: "",
@@ -835,7 +835,7 @@ export const getEnforcedColumnFilter = (colId: string): FilterConfig => {
 	}
 	if (colId.startsWith("today")) {
 		return {
-			completed: "all",
+			completed: "uncompleted",
 			cancelled: "uncancelled",
 			priority: [],
 			text: "",
@@ -848,7 +848,7 @@ export const getEnforcedColumnFilter = (colId: string): FilterConfig => {
 	}
 	if (colId.startsWith("tomorrow")) {
 		return {
-			completed: "all",
+			completed: "uncompleted",
 			cancelled: "uncancelled",
 			priority: [],
 			text: "",
@@ -861,7 +861,7 @@ export const getEnforcedColumnFilter = (colId: string): FilterConfig => {
 	}
 	if (colId.startsWith("week") || colId.startsWith("this-week")) {
 		return {
-			completed: "all",
+			completed: "uncompleted",
 			cancelled: "uncancelled",
 			priority: [],
 			text: "",
@@ -874,7 +874,7 @@ export const getEnforcedColumnFilter = (colId: string): FilterConfig => {
 	}
 	if (colId.startsWith("later")) {
 		return {
-			completed: "all",
+			completed: "uncompleted",
 			cancelled: "uncancelled",
 			priority: [],
 			text: "",
@@ -887,7 +887,7 @@ export const getEnforcedColumnFilter = (colId: string): FilterConfig => {
 	}
 	if (colId.startsWith("no-date")) {
 		return {
-			completed: "all",
+			completed: "uncompleted",
 			cancelled: "uncancelled",
 			priority: [],
 			text: "",
