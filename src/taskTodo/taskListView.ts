@@ -90,19 +90,17 @@ export class TaskTodoTaskListView extends ItemView {
 		const tabs = this.plugin.settings.tabs.map(t => ({ id: t.id, title: t.title }));
 		const activeTabConfig = this.plugin.settings.tabs.find(t => t.id === this.activeTab) || this.plugin.settings.tabs[0];
 		
-		const visibleTasks = activeTabConfig ? tasks.filter(task => matchFilterWithDQL(task, activeTabConfig.filter, activeTabConfig.query, this.host)) : [];
+		const visibleTasks = activeTabConfig ? tasks.filter(task => matchFilterWithDQL(task, undefined, activeTabConfig.query, this.host)) : [];
 		this.renderHeader(layout, visibleTasks.length);
 		this.renderTabs(layout, tabs, visibleTasks);
 
 		if (activeTabConfig) {
 			let showCompleted = true;
-			if (activeTabConfig.queryMode === "advanced" && activeTabConfig.query) {
+			if (activeTabConfig.query) {
 				const q = activeTabConfig.query.toUpperCase();
 				if (q.includes('STATUS != "DONE"') || q.includes('STATUS = "TODO"') || q.includes('STATUS = "IN_PROGRESS"')) {
 					showCompleted = false;
 				}
-			} else if (activeTabConfig.filter && activeTabConfig.filter.completed === "uncompleted") {
-				showCompleted = false;
 			}
 
 			const columns = activeTabConfig.columns || [];
@@ -553,7 +551,7 @@ function groupTasksCustom(
 	for (const task of tasks) {
 		for (let idx = 0; idx < columns.length; idx++) {
 			const col = columns[idx];
-			if (col && matchFilterWithDQL(task, col.filter, col.query, host)) {
+			if (col && matchFilterWithDQL(task, undefined, col.query, host)) {
 				const bucket = buckets[idx];
 				if (bucket) {
 					bucket.items.push(task);

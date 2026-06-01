@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll } from "bun:test";
-import { matchFilter, preprocessDQLQuery, matchFilterWithDQL } from "../src/taskTodo/taskTodoFilter";
+import { matchFilter, preprocessDQLQuery, matchFilterWithDQL, parseDQLToFilter, filterConfigToDQL } from "../src/taskTodo/taskTodoFilter";
 import type { FilterConfig } from "../src/main";
 
 // Setup global mock for moment
@@ -332,6 +332,60 @@ describe("matchFilter", () => {
 				completed: "uncompleted"
 			});
 			expect(matchFilterWithDQL(item, filter, undefined, null)).toBe(true);
+		});
+	});
+
+	describe("parseDQLToFilter", () => {
+		test("empty query returns default filter", () => {
+			const res = parseDQLToFilter("");
+			expect(res.isPerfect).toBe(true);
+			expect(res.filter.completed).toBe("all");
+			expect(res.filter.cancelled).toBe("all");
+			expect(res.filter.priority).toEqual([]);
+			expect(res.filter.text).toBe("");
+			expect(res.filter.tag).toBe("");
+			expect(res.filter.assignee).toBe("");
+		});
+
+		test("basic status query parses correctly", () => {
+			const res = parseDQLToFilter('status != "DONE" AND status != "CANCELLED"');
+			expect(res.isPerfect).toBe(true);
+			expect(res.filter.completed).toBe("uncompleted");
+			expect(res.filter.cancelled).toBe("uncancelled");
+		});
+
+		test("text, tag, person queries parse correctly", () => {
+			const res = parseDQLToFilter('description contains "buy milk" AND tags contains "home" AND person = "John"');
+			expect(res.isPerfect).toBe(true);
+			expect(res.filter.text).toBe("buy milk");
+			expect(res.filter.tag).toBe("home");
+			expect(res.filter.assignee).toBe("John");
+		});
+
+		test("priority queries parse correctly", () => {
+			const res = parseDQLToFilter('(priority = "⏫" OR priority = "🔼")');
+			expect(res.isPerfect).toBe(true);
+			expect(res.filter.priority).toEqual(["highest", "high"]);
+		});
+
+		test("mixed mixed queries parse correctly", () => {
+			const res = parseDQLToFilter('status = "DONE" AND (priority = "⏬") AND description contains "feed cat"');
+			expect(res.isPerfect).toBe(true);
+			expect(res.filter.completed).toBe("completed");
+			expect(res.filter.priority).toEqual(["lowest"]);
+			expect(res.filter.text).toBe("feed cat");
+		});
+
+		test("advanced queries containing dates or functions return isPerfect false but extract parsable parts", () => {
+			const res1 = parseDQLToFilter('status != "DONE" AND due <= date(today)');
+			expect(res1.isPerfect).toBe(false);
+			expect(res1.filter.completed).toBe("uncompleted");
+
+			const res2 = parseDQLToFilter('status = "TODO" AND start != null');
+			expect(res2.isPerfect).toBe(false);
+
+			const res3 = parseDQLToFilter('path contains "project"');
+			expect(res3.isPerfect).toBe(false);
 		});
 	});
 });

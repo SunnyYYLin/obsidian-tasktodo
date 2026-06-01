@@ -213,3 +213,271 @@ export function matchFilterWithDQL(
 	}
 	return filter ? matchFilter(item, filter) : true;
 }
+
+export const filterConfigToDQL = (filter: FilterConfig | undefined): string => {
+	if (!filter) return "";
+	const parts: string[] = [];
+
+	// 1. Completed
+	if (filter.completed === "completed") {
+		parts.push('status = "DONE"');
+	} else if (filter.completed === "uncompleted") {
+		parts.push('status != "DONE"');
+	}
+
+	// 2. Cancelled
+	if (filter.cancelled === "cancelled") {
+		parts.push('status = "CANCELLED"');
+	} else if (filter.cancelled === "uncancelled") {
+		parts.push('status != "CANCELLED"');
+	}
+
+	// 3. Priority
+	if (filter.priority && filter.priority.length > 0) {
+		const priParts = filter.priority.map(pri => {
+			if (pri === "none") return 'priority = ""';
+			let emoji = "";
+			if (pri === "highest") emoji = "⏫";
+			else if (pri === "high") emoji = "🔼";
+			else if (pri === "medium") emoji = "🔽";
+			else if (pri === "low") emoji = "🔻";
+			else if (pri === "lowest") emoji = "⏬";
+			return `priority = "${emoji}"`;
+		}).filter(Boolean);
+		if (priParts.length > 0) {
+			parts.push(`(${priParts.join(" OR ")})`);
+		}
+	}
+
+	// 4. Dates
+	const dateParts: string[] = [];
+	const handleDateField = (field: DateFilterField, name: string) => {
+		if (!field || field.mode === "all") return;
+		if (field.mode === "no-date") {
+			dateParts.push(`${name} = null`);
+		} else if (field.mode === "has-date") {
+			dateParts.push(`${name} != null`);
+		} else if (field.mode === "today") {
+			dateParts.push(`${name} = date(today)`);
+		} else if (field.mode === "tomorrow") {
+			dateParts.push(`${name} = date(tomorrow)`);
+		} else if (field.mode === "this-week") {
+			dateParts.push(`(${name} >= date(today) AND ${name} <= date(next-week))`);
+		} else if (field.mode === "overdue") {
+			dateParts.push(`${name} < date(today)`);
+		} else if (field.mode === "today-or-overdue") {
+			dateParts.push(`${name} <= date(today)`);
+		} else if (field.mode === "later") {
+			dateParts.push(`${name} > date(next-week)`);
+		} else if (field.mode === "custom") {
+			const conds: string[] = [];
+			if (field.customStart) {
+				conds.push(`${name} >= date("${field.customStart}")`);
+			}
+			if (field.customEnd) {
+				conds.push(`${name} <= date("${field.customEnd}")`);
+			}
+			if (conds.length > 0) {
+				dateParts.push(`(${conds.join(" AND ")})`);
+			}
+		}
+	};
+
+	if (filter.startDate) handleDateField(filter.startDate, "start");
+	if (filter.scheduledDate) handleDateField(filter.scheduledDate, "scheduled");
+	if (filter.dueDate) handleDateField(filter.dueDate, "due");
+
+	if (dateParts.length > 0) {
+		const rel = filter.dateFilterRelation || "or";
+		parts.push(`(${dateParts.join(` ${rel.toUpperCase()} `)})`);
+	}
+
+	// 5. Text search
+	if (filter.text && filter.text.trim() !== "") {
+		parts.push(`description contains "${filter.text.replace(/"/g, '\\"')}"`);
+	}
+
+	// 6. Tag filter
+	if (filter.tag && filter.tag.trim() !== "") {
+		parts.push(`tags contains "${filter.tag}"`);
+	}
+
+	// 7. Assignee filter
+	if (filter.assignee && filter.assignee.trim() !== "") {
+		parts.push(`person = "${filter.assignee.replace(/"/g, '\\"')}"`);
+	}
+
+	return parts.join(" AND ");
+};
+
+export function parseDQLToFilter(dql: string): { filter: FilterConfig; isPerfect: boolean } {
+	const trimmedDql = dql.trim();
+	const createDefaultFilter = (): FilterConfig => ({
+		completed: "all",
+		cancelled: "all",
+		priority: [],
+		text: "",
+		tag: "",
+		assignee: "",
+		startDate: { mode: "all" },
+		scheduledDate: { mode: "all" },
+		dueDate: { mode: "all" },
+	});
+
+	if (!trimmedDql) {
+		return { filter: createDefaultFilter(), isPerfect: true };
+	}
+
+	const filter = createDefaultFilter();
+	let isPerfect = true;
+
+	// Split by AND outside of parentheses or quotes
+	const parts: string[] = [];
+	let current = "";
+	let parenDepth = 0;
+	let inQuote: '"' | "'" | null = null;
+
+	for (let idx = 0; idx < trimmedDql.length; idx++) {
+		const char = trimmedDql[idx];
+		if (char === '"' || char === "'") {
+			if (!inQuote) {
+				inQuote = char;
+			} else if (inQuote === char && trimmedDql[idx - 1] !== '\\') {
+				inQuote = null;
+			}
+			current += char;
+		} else if (inQuote) {
+			current += char;
+		} else {
+			if (char === "(") {
+				parenDepth++;
+				current += char;
+			} else if (char === ")") {
+				parenDepth--;
+				current += char;
+			} else if (parenDepth === 0 && trimmedDql.substring(idx, idx + 5).toUpperCase() === " AND ") {
+				parts.push(current.trim());
+				current = "";
+				idx += 4; // skip " AND"
+			} else {
+				current += char;
+			}
+		}
+	}
+	if (inQuote || parenDepth !== 0) {
+		return { filter: createDefaultFilter(), isPerfect: false };
+	}
+	if (current.trim()) {
+		parts.push(current.trim());
+	}
+
+	const unquote = (str: string): string => {
+		str = str.trim();
+		if ((str.startsWith('"') && str.endsWith('"')) || (str.startsWith("'") && str.endsWith("'"))) {
+			return str.substring(1, str.length - 1).replace(/\\"/g, '"');
+		}
+		return str;
+	};
+
+	for (const part of parts) {
+		const trimmedPart = part.trim();
+		if (!trimmedPart) continue;
+
+		// 1. Completed status
+		if (/^status\s*=\s*["']DONE["']$/i.test(trimmedPart)) {
+			filter.completed = "completed";
+		} else if (/^status\s*!=\s*["']DONE["']$/i.test(trimmedPart)) {
+			filter.completed = "uncompleted";
+		}
+		// 2. Cancelled status
+		else if (/^status\s*=\s*["']CANCELLED["']$/i.test(trimmedPart)) {
+			filter.cancelled = "cancelled";
+		} else if (/^status\s*!=\s*["']CANCELLED["']$/i.test(trimmedPart)) {
+			filter.cancelled = "uncancelled";
+		}
+		// 3. Text search: description contains "..."
+		else if (/^description\s+contains\s+/i.test(trimmedPart)) {
+			const val = trimmedPart.substring(trimmedPart.toLowerCase().indexOf("contains") + 8).trim();
+			filter.text = unquote(val);
+		}
+		// 4. Tag filter: tags contains "..."
+		else if (/^tags\s+contains\s+/i.test(trimmedPart)) {
+			const val = trimmedPart.substring(trimmedPart.toLowerCase().indexOf("contains") + 8).trim();
+			filter.tag = unquote(val);
+		}
+		// 5. Assignee: person = "..."
+		else if (/^person\s*=\s*/i.test(trimmedPart)) {
+			const val = trimmedPart.substring(trimmedPart.indexOf("=") + 1).trim();
+			filter.assignee = unquote(val);
+		}
+		// 6. Priority: (priority = "⏬" OR priority = "🔼")
+		else if (trimmedPart.startsWith("(") && trimmedPart.endsWith(")")) {
+			const inside = trimmedPart.substring(1, trimmedPart.length - 1).trim();
+			const orParts: string[] = [];
+			let currentOr = "";
+			let inOrQuote: '"' | "'" | null = null;
+			for (let idx = 0; idx < inside.length; idx++) {
+				const char = inside[idx];
+				if (char === '"' || char === "'") {
+					if (!inOrQuote) inOrQuote = char;
+					else if (inOrQuote === char && inside[idx - 1] !== '\\') inOrQuote = null;
+					currentOr += char;
+				} else if (inOrQuote) {
+					currentOr += char;
+				} else {
+					if (inside.substring(idx, idx + 4).toUpperCase() === " OR ") {
+						orParts.push(currentOr.trim());
+						currentOr = "";
+						idx += 3; // skip " OR"
+					} else {
+						currentOr += char;
+					}
+				}
+			}
+			if (inOrQuote) {
+				isPerfect = false;
+				continue;
+			}
+			if (currentOr.trim()) orParts.push(currentOr.trim());
+
+			const parsedPriorities: string[] = [];
+			let isValidPriorityExpr = true;
+			for (const orPart of orParts) {
+				const trimmedOr = orPart.trim();
+				const match = trimmedOr.match(/^priority\s*=\s*(.*)$/i);
+				if (!match) {
+					isValidPriorityExpr = false;
+					break;
+				}
+				const priVal = unquote(match[1] || "");
+				if (priVal === "") {
+					parsedPriorities.push("none");
+				} else if (priVal === "⏫") {
+					parsedPriorities.push("highest");
+				} else if (priVal === "🔼") {
+					parsedPriorities.push("high");
+				} else if (priVal === "🔽") {
+					parsedPriorities.push("medium");
+				} else if (priVal === "🔻") {
+					parsedPriorities.push("low");
+				} else if (priVal === "⏬") {
+					parsedPriorities.push("lowest");
+				} else {
+					isValidPriorityExpr = false;
+					break;
+				}
+			}
+			if (isValidPriorityExpr) {
+				filter.priority = parsedPriorities;
+			} else {
+				isPerfect = false;
+			}
+		}
+		// Any other fields or operators (like date checks) mean it's advanced
+		else {
+			isPerfect = false;
+		}
+	}
+
+	return { filter, isPerfect };
+}
