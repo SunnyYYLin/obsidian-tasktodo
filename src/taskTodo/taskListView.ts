@@ -90,7 +90,12 @@ export class TaskTodoTaskListView extends ItemView {
 		const tabs = this.plugin.settings.tabs.map(t => ({ id: t.id, title: t.title }));
 		const activeTabConfig = this.plugin.settings.tabs.find(t => t.id === this.activeTab) || this.plugin.settings.tabs[0];
 		
-		const visibleTasks = activeTabConfig ? tasks.filter(task => matchFilterWithDQL(task, undefined, activeTabConfig.query, this.host)) : [];
+		const visibleTasks = activeTabConfig 
+			? tasks.filter(task => {
+				if (task.parent !== null) return false;
+				return matchFilterWithDQL(task, undefined, activeTabConfig.query, this.host);
+			}) 
+			: [];
 		this.renderHeader(layout, visibleTasks.length);
 		this.renderTabs(layout, tabs, visibleTasks);
 
