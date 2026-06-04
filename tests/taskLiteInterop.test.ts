@@ -21,7 +21,7 @@ function makeTask(overrides: Partial<TaskTodoTaskLine> = {}): TaskTodoTaskLine {
 		onCompletion: null,
 		id: null,
 		dependsOn: null,
-		person: [],
+		assignee: [],
 		blockLink: null,
 		...overrides,
 	};
@@ -118,7 +118,7 @@ describe("serializeTaskLine", () => {
 			onCompletion: "archive",
 			id: "tid1",
 			dependsOn: "tid0",
-			person: ["John", "Mary"],
+			assignee: ["John", "Mary"],
 			blockLink: "^abc",
 		};
 		const line = serializeTaskLine(task, mockRegistry);
@@ -134,7 +134,7 @@ describe("serializeTaskLine", () => {
 		expect(line).toContain(`${TASK_SYMBOLS.onCompletion} archive`);
 		expect(line).toContain(`${TASK_SYMBOLS.dependsOn} tid0`);
 		expect(line).toContain(`${TASK_SYMBOLS.id} tid1`);
-		expect(line).toContain(`${TASK_SYMBOLS.person} John & Mary`);
+		expect(line).toContain(`${TASK_SYMBOLS.assignee} John & Mary`);
 		expect(line).toEndWith("^abc");
 	});
 

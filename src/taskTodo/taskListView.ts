@@ -404,7 +404,7 @@ export class TaskTodoTaskListView extends ItemView {
 						onCompletion: data.onCompletion || null,
 						id: data.id || null,
 						dependsOn: data.dependsOn || null,
-						person: data.person,
+						assignee: data.assignee,
 						path: targetPath || "Tasks.md",
 					};
 					try {
@@ -441,7 +441,7 @@ export class TaskTodoTaskListView extends ItemView {
 						onCompletion: data.onCompletion || null,
 						id: data.id || null,
 						dependsOn: data.dependsOn || null,
-						person: data.person,
+						assignee: data.assignee,
 						path: parent.path,
 						parentLineNumber: parent.lineNumber,
 					};
@@ -478,7 +478,7 @@ export class TaskTodoTaskListView extends ItemView {
 						onCompletion: data.onCompletion || null,
 						id: data.id || null,
 						dependsOn: data.dependsOn || null,
-						person: data.person,
+						assignee: data.assignee,
 					};
 					await this.host.api.editTask(item.path, item.lineNumber, patch);
 
@@ -619,6 +619,7 @@ function otherMetadataParts(task: TaskTodoTaskLine): string[] {
 	if (task.id) parts.push(`${TASK_SYMBOLS.id} ${task.id}`);
 	if (task.onCompletion) parts.push(`${TASK_SYMBOLS.onCompletion} ${task.onCompletion}`);
 	if (task.dependsOn) parts.push(`${TASK_SYMBOLS.dependsOn} ${task.dependsOn}`);
+	if (task.assignee && task.assignee.length > 0) parts.push(`${TASK_SYMBOLS.assignee} ${task.assignee.join(" & ")}`);
 	if (task.blockLink) parts.push(task.blockLink);
 	return parts;
 }

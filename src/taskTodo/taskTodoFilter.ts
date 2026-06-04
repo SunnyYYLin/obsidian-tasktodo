@@ -68,9 +68,10 @@ export function matchFilter(item: TaskListItem, filter: FilterConfig): boolean {
 	if (filter.assignee && filter.assignee.trim() !== "") {
 		const assigneeQuery = filter.assignee.toLowerCase().trim();
 		const cleanQuery = assigneeQuery.startsWith("@") ? assigneeQuery.substring(1) : assigneeQuery;
-		const taskPeople = extractPeople(item.task.description).map((p: string) => 
-			p.toLowerCase().startsWith("@") ? p.toLowerCase().substring(1) : p.toLowerCase()
-		);
+		const taskPeople = [
+			...extractPeople(item.task.description).map((p: string) => p.startsWith("@") ? p.substring(1) : p),
+			...(item.task.assignee || [])
+		].map((p: string) => p.toLowerCase());
 		if (!taskPeople.some((p: string) => p.includes(cleanQuery))) {
 			return false;
 		}
@@ -304,7 +305,7 @@ export const filterConfigToDQL = (filter: FilterConfig | undefined): string => {
 
 	// 7. Assignee filter
 	if (filter.assignee && filter.assignee.trim() !== "") {
-		parts.push(`person = "${filter.assignee.replace(/"/g, '\\"')}"`);
+		parts.push(`assignee = "${filter.assignee.replace(/"/g, '\\"')}"`);
 	}
 
 	return parts.join(" AND ");
@@ -405,8 +406,8 @@ export function parseDQLToFilter(dql: string): { filter: FilterConfig; isPerfect
 			const val = trimmedPart.substring(trimmedPart.toLowerCase().indexOf("contains") + 8).trim();
 			filter.tag = unquote(val);
 		}
-		// 5. Assignee: person = "..."
-		else if (/^person\s*=\s*/i.test(trimmedPart)) {
+		// 5. Assignee: assignee = "..." or person = "..."
+		else if (/^(?:assignee|person)\s*=\s*/i.test(trimmedPart)) {
 			const val = trimmedPart.substring(trimmedPart.indexOf("=") + 1).trim();
 			filter.assignee = unquote(val);
 		}

@@ -13,7 +13,7 @@ export interface TaskFormData {
 	onCompletion: string | null;
 	id: string | null;
 	dependsOn: string | null;
-	person: string[];
+	assignee: string[];
 }
 
 class TargetFileSuggestModal extends SuggestModal<string> {
@@ -95,7 +95,7 @@ export class TaskFormModal extends Modal {
 			onCompletion: task?.onCompletion || null,
 			id: task?.id || null,
 			dependsOn: task?.dependsOn || null,
-			person: task?.person || [],
+			assignee: task?.assignee || [],
 		};
 
 		this.targetFileValue = initialData?.path?.replace(/\.md$/iu, "") || "Tasks";
@@ -141,7 +141,7 @@ export class TaskFormModal extends Modal {
 		this.addTextSetting(this.contentEl, `${TASK_SYMBOLS.dependsOn} ${t("modal.dependsOn")}`, "id1, id2", "dependsOn");
 
 		// 8. Assignee
-		this.addTextSetting(this.contentEl, `${TASK_SYMBOLS.person} ${t("modal.assignee")}`, "John & Mary", "person", true);
+		this.addTextSetting(this.contentEl, `${TASK_SYMBOLS.assignee} ${t("modal.assignee")}`, "John & Mary", "assignee", true);
 
 		// 9. Save and Cancel Buttons
 		new Setting(this.contentEl)
@@ -293,18 +293,18 @@ export class TaskFormModal extends Modal {
 		container: HTMLElement,
 		name: string,
 		placeholder: string,
-		key: "id" | "dependsOn" | "person",
-		isPerson = false
+		key: "id" | "dependsOn" | "assignee",
+		isAssignee = false
 	): void {
 		new Setting(container).setName(name).addText((text) => {
-			if (isPerson) {
-				text.setValue(this.formData.person.join(" & "));
+			if (isAssignee) {
+				text.setValue(this.formData.assignee.join(" & "));
 			} else {
 				text.setValue((this.formData[key] as string) || "");
 			}
 			text.setPlaceholder(placeholder).onChange((value) => {
-				if (isPerson) {
-					this.formData.person = value.split("&").map(p => p.trim()).filter(Boolean);
+				if (isAssignee) {
+					this.formData.assignee = value.split("&").map(p => p.trim()).filter(Boolean);
 				} else {
 					(this.formData[key] as string | null) = value || null;
 				}

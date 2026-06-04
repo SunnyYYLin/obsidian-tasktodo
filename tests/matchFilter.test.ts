@@ -360,6 +360,15 @@ describe("matchFilter", () => {
 			expect(res.filter.text).toBe("buy milk");
 			expect(res.filter.tag).toBe("home");
 			expect(res.filter.assignee).toBe("John");
+
+			const resAssignee = parseDQLToFilter('assignee = "John"');
+			expect(resAssignee.isPerfect).toBe(true);
+			expect(resAssignee.filter.assignee).toBe("John");
+		});
+
+		test("assignee serialization to DQL", () => {
+			const filter = makeFilter({ assignee: "John" });
+			expect(filterConfigToDQL(filter)).toBe('assignee = "John"');
 		});
 
 		test("priority queries parse correctly", () => {
