@@ -232,11 +232,11 @@ export class TaskFormModal extends Modal {
 		new Setting(container).setName(t("modal.priority")).setClass("taskslite-modal-setting-compact").addDropdown((dropdown) => {
 			dropdown.selectEl.addClass("taskslite-modal-compact-control");
 			dropdown.addOption("", t("common.none"));
-			dropdown.addOption(TASK_SYMBOLS.priority.highest, `${TASK_SYMBOLS.priority.highest} ${t("priority.highest")}`);
-			dropdown.addOption(TASK_SYMBOLS.priority.high, `${TASK_SYMBOLS.priority.high} ${t("priority.high")}`);
-			dropdown.addOption(TASK_SYMBOLS.priority.medium, `${TASK_SYMBOLS.priority.medium} ${t("priority.medium")}`);
-			dropdown.addOption(TASK_SYMBOLS.priority.low, `${TASK_SYMBOLS.priority.low} ${t("priority.low")}`);
-			dropdown.addOption(TASK_SYMBOLS.priority.lowest, `${TASK_SYMBOLS.priority.lowest} ${t("priority.lowest")}`);
+			dropdown.addOption("highest", `${TASK_SYMBOLS.priority.highest} ${t("priority.highest")}`);
+			dropdown.addOption("high", `${TASK_SYMBOLS.priority.high} ${t("priority.high")}`);
+			dropdown.addOption("medium", `${TASK_SYMBOLS.priority.medium} ${t("priority.medium")}`);
+			dropdown.addOption("low", `${TASK_SYMBOLS.priority.low} ${t("priority.low")}`);
+			dropdown.addOption("lowest", `${TASK_SYMBOLS.priority.lowest} ${t("priority.lowest")}`);
 			dropdown.setValue(this.formData.priority || "").onChange((value) => {
 				this.formData.priority = value || null;
 			});

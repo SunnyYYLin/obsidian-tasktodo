@@ -26,7 +26,10 @@ export const TASK_SYMBOLS = {
 export function serializeTaskLine(task: TaskTodoTaskLine, registry: { getByType(type: string): { symbol: string } }): string {
 	const symbol = registry.getByType(task.status).symbol || " ";
 	const parts = [task.description.trim()];
-	if (task.priority) parts.push(task.priority);
+	if (task.priority) {
+		const emoji = TASK_SYMBOLS.priority[task.priority as keyof typeof TASK_SYMBOLS.priority] || task.priority;
+		parts.push(emoji);
+	}
 	addDate(parts, TASK_SYMBOLS.start, task.dates.start);
 	addDate(parts, TASK_SYMBOLS.created, task.dates.created);
 	addDate(parts, TASK_SYMBOLS.scheduled, task.dates.scheduled);

@@ -41,11 +41,11 @@ export function compareTaskTodoItems(
 
 function priorityRank(task: TaskTodoTaskLine): number {
 	const priority = task.priority;
-	if (priority === TASK_SYMBOLS.priority.highest) return 0;
-	if (priority === TASK_SYMBOLS.priority.high) return 1;
-	if (priority === TASK_SYMBOLS.priority.medium) return 2;
-	if (priority === TASK_SYMBOLS.priority.low) return 4;
-	if (priority === TASK_SYMBOLS.priority.lowest) return 5;
+	if (priority === "highest" || priority === TASK_SYMBOLS.priority.highest) return 0;
+	if (priority === "high" || priority === TASK_SYMBOLS.priority.high) return 1;
+	if (priority === "medium" || priority === TASK_SYMBOLS.priority.medium) return 2;
+	if (priority === "low" || priority === TASK_SYMBOLS.priority.low) return 4;
+	if (priority === "lowest" || priority === TASK_SYMBOLS.priority.lowest) return 5;
 	return 3;
 }
 

@@ -333,7 +333,10 @@ export class TaskTodoTaskListView extends ItemView {
 		const context = meta.createDiv({cls: "taskslite-list-item-context"});
 		context.createSpan({text: item.basename});
 		if (item.parent) context.createSpan({text: item.parent.task.description, cls: "taskslite-list-parent"});
-		if (item.task.priority) context.createSpan({text: item.task.priority, cls: "taskslite-list-priority"});
+		if (item.task.priority) {
+			const emoji = TASK_SYMBOLS.priority[item.task.priority as keyof typeof TASK_SYMBOLS.priority] || item.task.priority;
+			context.createSpan({text: emoji, cls: "taskslite-list-priority"});
+		}
 
 		const dates = meta.createDiv({cls: "taskslite-list-item-dates"});
 		for (const datePart of taskDateParts(item.task)) {
