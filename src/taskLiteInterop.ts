@@ -4,10 +4,10 @@ export { getTaskLiteHost, TASKLITE_PLUGIN_ID, type TaskTodoCoreApi, type TaskTod
 
 export const TASK_SYMBOLS = {
 	priority: {
-		highest: "⏫",
-		high: "🔼",
-		medium: "🔽",
-		low: "🔻",
+		highest: "🔺",
+		high: "⏫",
+		medium: "🔼",
+		low: "🔽",
 		lowest: "⏬",
 	},
 	start: "🛫",

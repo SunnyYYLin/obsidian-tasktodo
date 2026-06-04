@@ -372,7 +372,7 @@ describe("matchFilter", () => {
 		});
 
 		test("priority queries parse correctly", () => {
-			const res = parseDQLToFilter('(priority = "⏫" OR priority = "🔼")');
+			const res = parseDQLToFilter('(priority = "🔺" OR priority = "⏫")');
 			expect(res.isPerfect).toBe(true);
 			expect(res.filter.priority).toEqual(["highest", "high"]);
 		});

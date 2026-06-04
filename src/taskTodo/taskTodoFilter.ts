@@ -238,10 +238,10 @@ export const filterConfigToDQL = (filter: FilterConfig | undefined): string => {
 		const priParts = filter.priority.map(pri => {
 			if (pri === "none") return 'priority = ""';
 			let emoji = "";
-			if (pri === "highest") emoji = "⏫";
-			else if (pri === "high") emoji = "🔼";
-			else if (pri === "medium") emoji = "🔽";
-			else if (pri === "low") emoji = "🔻";
+			if (pri === "highest") emoji = "🔺";
+			else if (pri === "high") emoji = "⏫";
+			else if (pri === "medium") emoji = "🔼";
+			else if (pri === "low") emoji = "🔽";
 			else if (pri === "lowest") emoji = "⏬";
 			return `priority = "${emoji}"`;
 		}).filter(Boolean);
@@ -453,13 +453,13 @@ export function parseDQLToFilter(dql: string): { filter: FilterConfig; isPerfect
 				const priVal = unquote(match[1] || "");
 				if (priVal === "") {
 					parsedPriorities.push("none");
-				} else if (priVal === "⏫") {
+				} else if (priVal === "🔺") {
 					parsedPriorities.push("highest");
-				} else if (priVal === "🔼") {
+				} else if (priVal === "⏫") {
 					parsedPriorities.push("high");
-				} else if (priVal === "🔽") {
+				} else if (priVal === "🔼") {
 					parsedPriorities.push("medium");
-				} else if (priVal === "🔻") {
+				} else if (priVal === "🔽") {
 					parsedPriorities.push("low");
 				} else if (priVal === "⏬") {
 					parsedPriorities.push("lowest");
