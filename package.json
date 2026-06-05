@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-tasktodo",
-	"version": "0.2.3-alpha.6",
+	"version": "0.2.3-alpha.7",
 	"description": "A task planning and today view powered by TaskLite Core.",
 	"main": "main.js",
 	"type": "module",

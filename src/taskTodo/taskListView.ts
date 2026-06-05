@@ -9,7 +9,7 @@ import {
   type App,
   type WorkspaceLeaf,
 } from "obsidian";
-import { t } from "../i18n";
+import { t, type I18nKey } from "../i18n";
 import {
   TASK_SYMBOLS,
   type TaskTodoHost,
@@ -492,8 +492,14 @@ export class TaskTodoTaskListView extends ItemView {
 
     const dates = container.createDiv({ cls: "taskslite-list-item-dates" });
     for (const { dateStr, dateType } of datesData) {
-      const { text, cssClass } = formatSmartDate(dateStr, dateType);
-      dates.createSpan({ text, cls: `taskslite-date-badge ${cssClass}` });
+      const { dateText, timeStr, cssClass, iconName, typeSuffix } = formatSmartDate(dateStr, dateType);
+      const badge = dates.createSpan({ cls: `taskslite-date-badge-split ${cssClass}` });
+      
+      const label = badge.createSpan({ cls: "badge-label" });
+      setIcon(label, iconName);
+      label.createSpan({ text: typeSuffix });
+      
+      badge.createSpan({ text: `${dateText}${timeStr}`, cls: "badge-value" });
     }
   }
 
@@ -834,98 +840,99 @@ function getPriorityColor(
   return colors[key] || colors.none;
 }
 
+interface FormattedDateResult {
+  dateText: string;
+  timeStr: string;
+  cssClass: string;
+  iconName: string;
+  typeSuffix: string;
+}
+
 function formatSmartDate(
   dateStr: string,
   dateType: "due" | "scheduled" | "start" | "done" | "created" | "cancelled",
-): { text: string; cssClass: string } {
+): FormattedDateResult {
   const m = (window as any).moment;
   const today = m().startOf("day");
   // Use flexible parsing to support both YYYY-MM-DD and YYYY-MM-DD HH:mm:ss
   const date = m(dateStr).startOf("day");
   const diff = date.diff(today, "days");
 
-  const symbol =
+  const iconName =
     dateType === "due"
-      ? TASK_SYMBOLS.due
+      ? "calendar"
       : dateType === "scheduled"
-        ? TASK_SYMBOLS.scheduled
+        ? "calendar-clock"
         : dateType === "start"
-          ? TASK_SYMBOLS.start
+          ? "play"
           : dateType === "done"
-            ? TASK_SYMBOLS.done
+            ? "check-square"
             : dateType === "created"
-              ? TASK_SYMBOLS.created
-              : TASK_SYMBOLS.cancelled;
+              ? "plus-circle"
+              : "circle-slash";
 
-  let label: string;
-  let cssClass: string;
+  // 1. Get Date Type Suffix (e.g. 截止 / 计划 / 开始 / 完成 / 取消 / 创建)
+  const typeKey = `task.date.${dateType}` as I18nKey;
+  const typeSuffix = t(typeKey) || dateType;
 
-  // Check if dateStr contains time information (hour-minute-second)
+  // 2. Parse time if present
   const hasTime = dateStr.length > 10 && dateStr.includes(":");
-  let timeSuffix = "";
+  let timeStr = "";
   if (hasTime) {
     const parsedDate = m(dateStr);
     if (parsedDate.isValid()) {
       const hasSeconds = dateStr.split(":").length - 1 >= 2;
-      timeSuffix = " " + parsedDate.format(hasSeconds ? "HH:mm:ss" : "HH:mm");
+      timeStr = " " + parsedDate.format(hasSeconds ? "HH:mm:ss" : "HH:mm");
     }
   }
 
-  // 完成/取消/创建日期，以及 start 日期在过去的，都用中性样式
-  const isNeutralPast =
-    dateType === "done" ||
-    dateType === "created" ||
-    dateType === "cancelled" ||
-    (dateType === "start" && diff < 0);
-
-  if (isNeutralPast) {
-    label = m(dateStr).format("M\u6708D\u65e5 ddd") + timeSuffix;
-    cssClass = dateType === "done" ? "task-date-done" : "task-date-future";
-  } else if (diff === 0) {
-    const suffix =
-      dateType === "start"
-        ? ""
-        : dateType === "due"
-          ? ` \u00b7 ${t("task.date.due")}`
-          : ` \u00b7 ${t("task.date.scheduled")}`;
-    const prefix =
-      dateType === "start" ? t("task.date.startsToday") : t("task.date.today");
-    label = `${prefix}${timeSuffix}${suffix}`;
-    cssClass = "task-date-today";
+  // 3. Construct relative / absolute date string in a unified way
+  let dateText = "";
+  if (diff === 0) {
+    dateText = t("task.date.today"); // "今天"
   } else if (diff === 1) {
-    if (dateType === "start") {
-      label = t("task.date.startsTomorrow") + timeSuffix;
-    } else {
-      const suffix =
-        dateType === "due"
-          ? ` \u00b7 ${t("task.date.due")}`
-          : ` \u00b7 ${t("task.date.scheduled")}`;
-      label = `${t("task.date.tomorrow")}${timeSuffix}${suffix}`;
-    }
-    cssClass = "task-date-soon";
+    dateText = t("task.date.tomorrow"); // "明天"
+  } else if (diff === -1) {
+    dateText = t("task.date.yesterday"); // "昨天"
   } else if (diff > 1 && diff <= 7) {
     const weekday = m(dateStr).format("ddd");
-    label = `${weekday}${timeSuffix} \u00b7 ${t("task.date.daysLater").replace("{n}", String(diff))}`;
-    cssClass = "task-date-soon";
-  } else if (diff > 7) {
+    dateText = `${weekday} (${t("task.date.daysLater").replace("{n}", String(diff))})`; // e.g. "周六 (2天后)"
+  } else if (diff >= -7 && diff < -1) {
     const weekday = m(dateStr).format("ddd");
-    label = `${m(dateStr).format("M\u6708D\u65e5")}${timeSuffix} \u00b7 ${weekday}`;
-    cssClass = "task-date-future";
+    const relativeAgoText = t("task.date.daysAgoSimple")
+      ? t("task.date.daysAgoSimple").replace("{n}", String(Math.abs(diff)))
+      : `${Math.abs(diff)}天前`;
+    dateText = `${weekday} (${relativeAgoText})`; // e.g. "周二 (3天前)"
   } else {
-    // 只有 due/scheduled 的过去日期才会走到这里
-    let overdueLabel: string;
-    if (diff === -1) {
-      overdueLabel = t("task.date.yesterday");
-    } else if (diff >= -7) {
-      overdueLabel = t("task.date.daysAgo").replace("{n}", String(Math.abs(diff)));
-    } else {
-      overdueLabel = m(dateStr).format("M\u6708D\u65e5");
-    }
-    label = `${overdueLabel}${timeSuffix}`;
-    cssClass = "task-date-overdue";
+    // Beyond 7 days (absolute date + weekday)
+    const weekday = m(dateStr).format("ddd");
+    dateText = `${m(dateStr).format("M月D日")} ${weekday}`; // e.g. "6月15日 周一"
   }
 
-  return { text: `${symbol} ${label}`, cssClass };
+  // 4. Determine CSS class (overdue, today, soon, future, done)
+  let cssClass = "";
+  if (dateType === "done") {
+    cssClass = "done";
+  } else if (dateType === "cancelled" || dateType === "created") {
+    cssClass = "future";
+  } else if (dateType === "start") {
+    if (diff === 0) cssClass = "today";
+    else if (diff > 0) cssClass = "soon";
+    else cssClass = "future";
+  } else {
+    // due / scheduled
+    if (diff < 0) {
+      cssClass = "overdue";
+    } else if (diff === 0) {
+      cssClass = "today";
+    } else if (diff > 0 && diff <= 7) {
+      cssClass = "soon";
+    } else {
+      cssClass = "future";
+    }
+  }
+
+  return { dateText, timeStr, cssClass, iconName, typeSuffix };
 }
 
 function taskKey(item: Pick<TaskListItem, "path" | "lineNumber">): string {

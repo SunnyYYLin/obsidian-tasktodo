@@ -890,44 +890,102 @@
     font-size: 0.8rem;
 }
 
-.taskslite-date-badge {
+/* Split Pill Design (Soft/Pastel Modern Style) */
+.taskslite-date-badge-split {
     display: inline-flex;
     align-items: center;
-    padding: 0.05rem 0.4rem;
     border-radius: 4px;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    overflow: hidden;
+    border: 1px solid transparent;
+    background: var(--background-secondary);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.taskslite-date-badge-split .badge-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.1rem 0.35rem;
+    font-weight: 600;
+    font-size: 0.72rem;
+    border-right: 1px solid var(--background-modifier-border);
+}
+
+.taskslite-date-badge-split .badge-label svg {
+    width: 0.78rem;
+    height: 0.78rem;
+    stroke-width: 2.2;
+}
+
+.taskslite-date-badge-split .badge-value {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.45rem;
+    color: var(--text-normal);
     font-weight: 500;
-    white-space: nowrap;
-    transition:
-        background-color 0.15s ease,
-        color 0.15s ease;
 }
 
-.task-date-overdue {
+/* Color configurations */
+/* Overdue (Red) */
+.taskslite-date-badge-split.overdue {
+    border-color: color-mix(in srgb, var(--color-red) 25%, transparent);
+}
+.taskslite-date-badge-split.overdue .badge-label {
     color: var(--color-red);
-    background: color-mix(in srgb, var(--color-red) 10%, transparent);
-    font-weight: 600;
+    background-color: color-mix(in srgb, var(--color-red) 15%, transparent);
+}
+.taskslite-date-badge-split.overdue .badge-value {
+    background-color: color-mix(in srgb, var(--color-red) 5%, transparent);
 }
 
-.task-date-today {
+/* Today (Accent) */
+.taskslite-date-badge-split.today {
+    border-color: color-mix(in srgb, var(--text-accent) 30%, transparent);
+}
+.taskslite-date-badge-split.today .badge-label {
     color: var(--text-accent);
-    background: color-mix(in srgb, var(--text-accent) 12%, transparent);
-    font-weight: 600;
+    background-color: color-mix(in srgb, var(--text-accent) 15%, transparent);
+}
+.taskslite-date-badge-split.today .badge-value {
+    background-color: color-mix(in srgb, var(--text-accent) 5%, transparent);
 }
 
-.task-date-soon {
+/* Soon (Orange) */
+.taskslite-date-badge-split.soon {
+    border-color: color-mix(in srgb, var(--color-orange) 25%, transparent);
+}
+.taskslite-date-badge-split.soon .badge-label {
     color: var(--color-orange);
-    background: color-mix(in srgb, var(--color-orange) 10%, transparent);
+    background-color: color-mix(in srgb, var(--color-orange) 15%, transparent);
+}
+.taskslite-date-badge-split.soon .badge-value {
+    background-color: color-mix(in srgb, var(--color-orange) 5%, transparent);
 }
 
-.task-date-future {
+/* Future (Muted / Neutral) */
+.taskslite-date-badge-split.future {
+    border-color: color-mix(in srgb, var(--text-muted) 20%, transparent);
+}
+.taskslite-date-badge-split.future .badge-label {
     color: var(--text-muted);
-    background: color-mix(in srgb, var(--text-muted) 8%, transparent);
+    background-color: color-mix(in srgb, var(--text-muted) 10%, transparent);
+}
+.taskslite-date-badge-split.future .badge-value {
+    background-color: color-mix(in srgb, var(--text-muted) 3%, transparent);
 }
 
-.task-date-done {
+/* Done (Green) */
+.taskslite-date-badge-split.done {
+    border-color: color-mix(in srgb, var(--color-green) 25%, transparent);
+}
+.taskslite-date-badge-split.done .badge-label {
     color: var(--color-green);
-    background: color-mix(in srgb, var(--color-green) 10%, transparent);
+    background-color: color-mix(in srgb, var(--color-green) 15%, transparent);
+}
+.taskslite-date-badge-split.done .badge-value {
+    background-color: color-mix(in srgb, var(--color-green) 5%, transparent);
 }
 
 /* === Inline markdown in title (Obsidian MarkdownRenderer) === */
@@ -1054,9 +1112,15 @@
 
 /* === Mobile adjustments for new card design === */
 @media (max-width: 700px) {
-    .taskslite-date-badge {
-        font-size: 0.76rem;
-        padding: 0.05rem 0.35rem;
+    .taskslite-date-badge-split {
+        font-size: 0.72rem;
+    }
+    .taskslite-date-badge-split .badge-label {
+        font-size: 0.68rem;
+        padding: 0.08rem 0.3rem;
+    }
+    .taskslite-date-badge-split .badge-value {
+        padding: 0.08rem 0.35rem;
     }
 
     .taskslite-list-file-path {
