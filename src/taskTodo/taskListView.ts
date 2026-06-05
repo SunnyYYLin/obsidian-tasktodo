@@ -463,6 +463,8 @@ export class TaskTodoTaskListView extends ItemView {
         | "created"
         | "cancelled";
     }> = [];
+    if (item.task.dates.start)
+      datesData.push({ dateStr: item.task.dates.start, dateType: "start" });
     if (item.task.dates.scheduled)
       datesData.push({
         dateStr: item.task.dates.scheduled,
@@ -470,8 +472,8 @@ export class TaskTodoTaskListView extends ItemView {
       });
     if (item.task.dates.due)
       datesData.push({ dateStr: item.task.dates.due, dateType: "due" });
-    if (item.task.dates.start)
-      datesData.push({ dateStr: item.task.dates.start, dateType: "start" });
+    if (item.task.dates.cancelled)
+      datesData.push({ dateStr: item.task.dates.cancelled, dateType: "cancelled" });
     if (item.task.dates.done)
       datesData.push({ dateStr: item.task.dates.done, dateType: "done" });
     if (datesData.length === 0) return;
@@ -826,7 +828,8 @@ function formatSmartDate(
 ): { text: string; cssClass: string } {
   const m = (window as any).moment;
   const today = m().startOf("day");
-  const date = m(dateStr, "YYYY-MM-DD").startOf("day");
+  // Use flexible parsing to support both YYYY-MM-DD and YYYY-MM-DD HH:mm:ss
+  const date = m(dateStr).startOf("day");
   const diff = date.diff(today, "days");
 
   const symbol =
@@ -845,6 +848,17 @@ function formatSmartDate(
   let label: string;
   let cssClass: string;
 
+  // Check if dateStr contains time information (hour-minute-second)
+  const hasTime = dateStr.length > 10 && dateStr.includes(":");
+  let timeSuffix = "";
+  if (hasTime) {
+    const parsedDate = m(dateStr);
+    if (parsedDate.isValid()) {
+      const hasSeconds = dateStr.split(":").length - 1 >= 2;
+      timeSuffix = " " + parsedDate.format(hasSeconds ? "HH:mm:ss" : "HH:mm");
+    }
+  }
+
   // 完成/取消/创建日期，以及 start 日期在过去的，都用中性样式
   const isNeutralPast =
     dateType === "done" ||
@@ -853,7 +867,7 @@ function formatSmartDate(
     (dateType === "start" && diff < 0);
 
   if (isNeutralPast) {
-    label = m(dateStr, "YYYY-MM-DD").format("M\u6708D\u65e5 ddd");
+    label = m(dateStr).format("M\u6708D\u65e5 ddd") + timeSuffix;
     cssClass = dateType === "done" ? "task-date-done" : "task-date-future";
   } else if (diff === 0) {
     const suffix =
@@ -864,36 +878,38 @@ function formatSmartDate(
           : ` \u00b7 ${t("task.date.scheduled")}`;
     const prefix =
       dateType === "start" ? t("task.date.startsToday") : t("task.date.today");
-    label = `${prefix}${suffix}`;
+    label = `${prefix}${timeSuffix}${suffix}`;
     cssClass = "task-date-today";
   } else if (diff === 1) {
     if (dateType === "start") {
-      label = t("task.date.startsTomorrow");
+      label = t("task.date.startsTomorrow") + timeSuffix;
     } else {
       const suffix =
         dateType === "due"
           ? ` \u00b7 ${t("task.date.due")}`
           : ` \u00b7 ${t("task.date.scheduled")}`;
-      label = `${t("task.date.tomorrow")}${suffix}`;
+      label = `${t("task.date.tomorrow")}${timeSuffix}${suffix}`;
     }
     cssClass = "task-date-soon";
   } else if (diff > 1 && diff <= 7) {
-    const weekday = m(dateStr, "YYYY-MM-DD").format("ddd");
-    label = `${weekday} \u00b7 ${t("task.date.daysLater").replace("{n}", String(diff))}`;
+    const weekday = m(dateStr).format("ddd");
+    label = `${weekday}${timeSuffix} \u00b7 ${t("task.date.daysLater").replace("{n}", String(diff))}`;
     cssClass = "task-date-soon";
   } else if (diff > 7) {
-    const weekday = m(dateStr, "YYYY-MM-DD").format("ddd");
-    label = `${m(dateStr, "YYYY-MM-DD").format("M\u6708D\u65e5")} \u00b7 ${weekday}`;
+    const weekday = m(dateStr).format("ddd");
+    label = `${m(dateStr).format("M\u6708D\u65e5")}${timeSuffix} \u00b7 ${weekday}`;
     cssClass = "task-date-future";
   } else {
     // 只有 due/scheduled 的过去日期才会走到这里
+    let overdueLabel: string;
     if (diff === -1) {
-      label = t("task.date.yesterday");
+      overdueLabel = t("task.date.yesterday");
     } else if (diff >= -7) {
-      label = t("task.date.daysAgo").replace("{n}", String(Math.abs(diff)));
+      overdueLabel = t("task.date.daysAgo").replace("{n}", String(Math.abs(diff)));
     } else {
-      label = m(dateStr, "YYYY-MM-DD").format("M\u6708D\u65e5");
+      overdueLabel = m(dateStr).format("M\u6708D\u65e5");
     }
+    label = `${overdueLabel}${timeSuffix}`;
     cssClass = "task-date-overdue";
   }
 

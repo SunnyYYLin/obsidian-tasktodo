@@ -255,20 +255,28 @@
 }
 
 .taskslite-list-checkbox {
-    display: inline-flex;
-    box-sizing: border-box;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 1.25rem;
-    width: 1.25rem;
-    height: 1.25rem;
-    padding: 0;
-    margin-top: 0.15rem;
-    border: 1.5px solid var(--background-modifier-border-hover);
-    border-radius: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    display: inline-flex !important;
+    box-sizing: border-box !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 1.25rem !important;
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+    min-width: 1.25rem !important;
+    min-height: 1.25rem !important;
+    max-width: 1.25rem !important;
+    max-height: 1.25rem !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    margin-top: 0.18rem !important;
+    border: 1.5px solid var(--background-modifier-border-hover) !important;
+    border-radius: 4px !important;
     cursor: pointer;
-    color: var(--text-muted);
-    background: var(--background-primary);
+    color: var(--text-muted) !important;
+    background: var(--background-primary) !important;
+    line-height: 1 !important;
 }
 
 .taskslite-list-checkbox:hover {
@@ -366,7 +374,20 @@
 }
 
 .taskslite-task-expand {
-    margin-top: 0.15rem;
+    flex: 0 0 1.25rem !important;
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+    min-width: 1.25rem !important;
+    min-height: 1.25rem !important;
+    max-width: 1.25rem !important;
+    max-height: 1.25rem !important;
+    margin-top: 0.18rem !important;
+    border-radius: 4px !important;
+}
+
+.taskslite-task-expand svg {
+    width: 0.85rem !important;
+    height: 0.85rem !important;
 }
 
 .taskslite-list-item-title {
