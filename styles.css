@@ -777,3 +777,198 @@
 
 
 
+
+/* === Task Card Redesign: Priority accent bar === */
+.taskslite-list-item {
+	/* Override existing border to include left accent bar */
+	border-left: 3px solid var(--text-faint);
+	transition: border-left-color 0.2s ease;
+}
+
+/* === Date badges === */
+.taskslite-list-item-dates {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.4rem;
+	min-width: 0;
+	margin-top: 0.2rem;
+}
+
+.taskslite-date-badge {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.1rem 0.45rem;
+	border-radius: 4px;
+	font-size: 0.82rem;
+	font-weight: 500;
+	white-space: nowrap;
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.task-date-overdue {
+	color: var(--color-red);
+	background: color-mix(in srgb, var(--color-red) 10%, transparent);
+	font-weight: 600;
+}
+
+.task-date-today {
+	color: var(--text-accent);
+	background: color-mix(in srgb, var(--text-accent) 12%, transparent);
+	font-weight: 600;
+}
+
+.task-date-soon {
+	color: var(--color-orange);
+	background: color-mix(in srgb, var(--color-orange) 10%, transparent);
+}
+
+.task-date-future {
+	color: var(--text-muted);
+	background: color-mix(in srgb, var(--text-muted) 8%, transparent);
+}
+
+.task-date-done {
+	color: var(--color-green);
+	background: color-mix(in srgb, var(--color-green) 10%, transparent);
+}
+
+/* === Inline markdown in title === */
+.taskslite-list-item-title .taskslite-tag {
+	color: var(--text-accent);
+	background: color-mix(in srgb, var(--text-accent) 10%, transparent);
+	padding: 0 0.25rem;
+	border-radius: 3px;
+	font-size: 0.92em;
+	cursor: pointer;
+}
+
+.taskslite-list-item-title .taskslite-tag:hover {
+	background: color-mix(in srgb, var(--text-accent) 20%, transparent);
+}
+
+.taskslite-list-item-title .taskslite-wiki-link {
+	color: var(--text-accent);
+	text-decoration: underline;
+	text-decoration-style: dotted;
+	cursor: pointer;
+}
+
+.taskslite-list-item-title .taskslite-wiki-link:hover {
+	text-decoration-style: solid;
+	color: var(--text-accent);
+}
+
+.taskslite-list-item-title .taskslite-inline-link {
+	color: var(--text-accent);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.taskslite-list-item-title .taskslite-inline-link:hover {
+	color: var(--text-accent);
+}
+
+.taskslite-list-item-title .taskslite-inline-code {
+	font-family: var(--font-monospace);
+	font-size: 0.88em;
+	padding: 0.05rem 0.3rem;
+	background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+	border-radius: 3px;
+	color: var(--text-normal);
+}
+
+.taskslite-list-item-title .taskslite-inline-bold {
+	font-weight: 600;
+}
+
+.taskslite-list-item-title .taskslite-inline-italic {
+	font-style: italic;
+}
+
+/* === Context layer === */
+.taskslite-list-file-path {
+	font-size: 0.8rem;
+	color: var(--text-muted);
+	max-width: 12rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.taskslite-list-assignee {
+	color: var(--text-muted);
+}
+
+/* === Metadata toggle (collapsed by default) === */
+.taskslite-metadata-wrapper {
+	margin-top: 0.15rem;
+}
+
+.taskslite-metadata-toggle {
+	-webkit-appearance: none;
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.2rem;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--text-muted);
+	font: inherit;
+	font-size: 0.82rem;
+	cursor: pointer;
+	border-radius: 3px;
+	transition: color 0.15s ease;
+}
+
+.taskslite-metadata-toggle:hover {
+	color: var(--text-normal);
+}
+
+.taskslite-metadata-content {
+	display: none;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem;
+	margin-top: 0.15rem;
+	padding-left: 0.5rem;
+}
+
+.taskslite-metadata-content.taskslite-metadata-expanded {
+	display: flex;
+}
+
+.taskslite-metadata-content .taskslite-list-metadata {
+	font-size: 0.82rem;
+	color: var(--text-muted);
+}
+
+/* === Context row styling update === */
+.taskslite-list-item-context {
+	/* Override existing to use new gap and allow wrapping */
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+/* === Mobile adjustments for new card design === */
+@media (max-width: 700px) {
+	.taskslite-date-badge {
+		font-size: 0.76rem;
+		padding: 0.05rem 0.35rem;
+	}
+
+	.taskslite-list-file-path {
+		max-width: 8rem;
+	}
+
+	.taskslite-metadata-toggle {
+		font-size: 0.76rem;
+	}
+
+	.taskslite-metadata-content .taskslite-list-metadata {
+		font-size: 0.76rem;
+	}
+}
