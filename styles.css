@@ -993,78 +993,8 @@
     color: var(--text-muted);
 }
 
-/* === Metadata toggle (collapsed by default) === */
-.taskslite-metadata-wrapper {
-    margin-top: 0.2rem;
-}
-
-.taskslite-metadata-toggle {
-    -webkit-appearance: none;
-    appearance: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 2px 6px;
-    border: 0;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-.taskslite-metadata-toggle:hover {
-    background-color: var(--background-modifier-hover);
-    color: var(--text-normal);
-}
-
-.taskslite-metadata-toggle-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 0.9rem;
-    height: 0.9rem;
-}
-
-.taskslite-metadata-toggle-icon svg {
-    width: 0.9rem;
-    height: 0.9rem;
-}
-
-.taskslite-metadata-toggle-text {
-    font-weight: 500;
-}
-
-.taskslite-metadata-content {
-    display: none;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.4rem;
-    margin-top: 0.35rem;
-    padding: 0.4rem 0.6rem;
-    background: var(--background-primary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-}
-
-.taskslite-metadata-content.taskslite-metadata-expanded {
-    display: flex;
-}
-
-.taskslite-metadata-content .taskslite-list-metadata {
-    font-size: 0.75rem;
-    font-family: var(--font-monospace);
-    color: var(--text-muted);
-    background: color-mix(in srgb, var(--background-modifier-border) 25%, transparent);
-    padding: 0.1rem 0.35rem;
-    border-radius: 3px;
-    border: 1px solid var(--background-modifier-border);
-}
-
-/* === Context row styling update === */
-.taskslite-list-item-context {
-    /* Override existing to use new gap and allow wrapping */
+/* === Details & Metadata row styling === */
+.taskslite-list-item-details {
     display: inline-flex;
     flex-wrap: wrap;
     align-items: center;
@@ -1072,6 +1002,16 @@
     font-size: 0.8rem;
     color: var(--text-muted);
     margin-top: 0.15rem;
+}
+
+.taskslite-list-item-details .taskslite-list-metadata {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--background-modifier-border) 15%, transparent);
+    padding: 0.05rem 0.3rem;
+    border-radius: 3px;
+    border: 1px solid var(--background-modifier-border);
+    font-family: var(--font-monospace);
 }
 
 /* === Mobile adjustments for new card design === */

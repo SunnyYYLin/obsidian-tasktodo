@@ -298,8 +298,7 @@ export class TaskTodoTaskListView extends ItemView {
     const body = row.createDiv({ cls: "taskslite-list-item-body" });
     await this.renderItemTitle(body, item);
     this.renderItemDates(body, item);
-    this.renderItemContext(body, item);
-    this.renderItemMetadata(body, item);
+    this.renderItemDetails(body, item);
 
     row.addEventListener("click", () => {
       const file = this.appRef.vault.getAbstractFileByPath(item.path);
@@ -484,12 +483,13 @@ export class TaskTodoTaskListView extends ItemView {
     }
   }
 
-  private renderItemContext(container: HTMLElement, item: TaskListItem): void {
-    const context = container.createDiv({ cls: "taskslite-list-item-context" });
+  private renderItemDetails(container: HTMLElement, item: TaskListItem): void {
+    const details = container.createDiv({ cls: "taskslite-list-item-details" });
+
     // File path (show relative path, truncate if too long)
     const pathText =
       item.path.length > 40 ? "\u2026" + item.path.slice(-37) : item.path;
-    const pathEl = context.createSpan({
+    const pathEl = details.createSpan({
       text: `\ud83d\udcc1 ${pathText}`,
       cls: "taskslite-list-file-path",
     });
@@ -497,7 +497,7 @@ export class TaskTodoTaskListView extends ItemView {
 
     // Parent task
     if (item.parent) {
-      context.createSpan({
+      details.createSpan({
         text: `\u21b3 ${item.parent.task.description}`,
         cls: "taskslite-list-parent",
       });
@@ -505,57 +505,43 @@ export class TaskTodoTaskListView extends ItemView {
 
     // Assignee
     if (item.task.assignee && item.task.assignee.length > 0) {
-      context.createSpan({
+      details.createSpan({
         text: `\ud83d\udc64 ${item.task.assignee.join(" & ")}`,
         cls: "taskslite-list-assignee",
       });
     }
-  }
 
-  private renderItemMetadata(container: HTMLElement, item: TaskListItem): void {
-    // Build metadata parts
-    const parts: string[] = [];
-    if (item.task.recurrence)
-      parts.push(`${TASK_SYMBOLS.recurrence} ${item.task.recurrence}`);
-    if (item.task.dependsOn)
-      parts.push(`${TASK_SYMBOLS.dependsOn} ${item.task.dependsOn}`);
-    if (item.task.onCompletion)
-      parts.push(`${TASK_SYMBOLS.onCompletion} ${item.task.onCompletion}`);
-    if (item.task.id) parts.push(`${TASK_SYMBOLS.id} ${item.task.id}`);
-    if (item.task.blockLink) parts.push(item.task.blockLink);
-    if (parts.length === 0) return;
-
-    const wrapper = container.createDiv({ cls: "taskslite-metadata-wrapper" });
-
-    // Toggle button (always collapsed by default)
-    const toggle = wrapper.createEl("button", {
-      cls: "taskslite-metadata-toggle",
-      attr: {
-        "aria-label": t("task.metadata.label"),
-        "aria-expanded": "false",
-      },
-    });
-    const toggleIcon = toggle.createSpan({ cls: "taskslite-metadata-toggle-icon" });
-    setIcon(toggleIcon, "chevron-right");
-    toggle.createSpan({
-      text: `${t("task.metadata.label")} (${parts.length})`,
-      cls: "taskslite-metadata-toggle-text",
-    });
-
-    // Content area (hidden by default)
-    const content = wrapper.createDiv({ cls: "taskslite-metadata-content" });
-    for (const part of parts) {
-      content.createSpan({ text: part, cls: "taskslite-list-metadata" });
+    // Other metadata
+    if (item.task.recurrence) {
+      details.createSpan({
+        text: `${TASK_SYMBOLS.recurrence} ${item.task.recurrence}`,
+        cls: "taskslite-list-metadata",
+      });
     }
-
-    toggle.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const expanded = toggle.getAttribute("aria-expanded") === "true";
-      toggle.setAttribute("aria-expanded", String(!expanded));
-      toggleIcon.empty();
-      setIcon(toggleIcon, expanded ? "chevron-right" : "chevron-down");
-      content.toggleClass("taskslite-metadata-expanded", !expanded);
-    });
+    if (item.task.dependsOn) {
+      details.createSpan({
+        text: `${TASK_SYMBOLS.dependsOn} ${item.task.dependsOn}`,
+        cls: "taskslite-list-metadata",
+      });
+    }
+    if (item.task.onCompletion) {
+      details.createSpan({
+        text: `${TASK_SYMBOLS.onCompletion} ${item.task.onCompletion}`,
+        cls: "taskslite-list-metadata",
+      });
+    }
+    if (item.task.id) {
+      details.createSpan({
+        text: `${TASK_SYMBOLS.id} ${item.task.id}`,
+        cls: "taskslite-list-metadata",
+      });
+    }
+    if (item.task.blockLink) {
+      details.createSpan({
+        text: item.task.blockLink,
+        cls: "taskslite-list-metadata",
+      });
+    }
   }
 
   private async renderChildList(
