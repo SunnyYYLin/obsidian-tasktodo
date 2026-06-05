@@ -336,7 +336,7 @@
 
 .taskslite-list-item-title-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.25rem;
     min-width: 0;
 }
@@ -363,6 +363,10 @@
 .taskslite-list-action:hover {
     background: var(--background-modifier-hover);
     color: var(--text-normal);
+}
+
+.taskslite-task-expand {
+    margin-top: 0.15rem;
 }
 
 .taskslite-list-item-title {
@@ -906,17 +910,20 @@
 }
 
 /* === Inline markdown in title (Obsidian MarkdownRenderer) === */
-.taskslite-list-item-title .markdown-rendered {
-    display: inline;
+.taskslite-list-item-title.markdown-rendered,
+.taskslite-list-item-title {
+    display: inline-block;
 }
 
-.taskslite-list-item-title .markdown-rendered p {
-    display: inline;
-    margin: 0;
-    padding: 0;
+.taskslite-list-item-title p,
+.taskslite-list-item-title.markdown-rendered p {
+    display: inline !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
-.taskslite-list-item-title .markdown-rendered .tag {
+.taskslite-list-item-title .tag,
+.taskslite-list-item-title.markdown-rendered .tag {
     color: var(--text-accent);
     background: color-mix(in srgb, var(--text-accent) 10%, transparent);
     padding: 0 0.25rem;
@@ -925,33 +932,39 @@
     cursor: pointer;
 }
 
-.taskslite-list-item-title .markdown-rendered .tag:hover {
+.taskslite-list-item-title .tag:hover,
+.taskslite-list-item-title.markdown-rendered .tag:hover {
     background: color-mix(in srgb, var(--text-accent) 20%, transparent);
 }
 
-.taskslite-list-item-title .markdown-rendered .internal-link {
+.taskslite-list-item-title .internal-link,
+.taskslite-list-item-title.markdown-rendered .internal-link {
     color: var(--text-accent);
     text-decoration: underline;
     text-decoration-style: dotted;
     cursor: pointer;
 }
 
-.taskslite-list-item-title .markdown-rendered .internal-link:hover {
+.taskslite-list-item-title .internal-link:hover,
+.taskslite-list-item-title.markdown-rendered .internal-link:hover {
     text-decoration-style: solid;
     color: var(--text-accent);
 }
 
-.taskslite-list-item-title .markdown-rendered .external-link {
+.taskslite-list-item-title .external-link,
+.taskslite-list-item-title.markdown-rendered .external-link {
     color: var(--text-accent);
     text-decoration: underline;
     text-underline-offset: 2px;
 }
 
-.taskslite-list-item-title .markdown-rendered .external-link:hover {
+.taskslite-list-item-title .external-link:hover,
+.taskslite-list-item-title.markdown-rendered .external-link:hover {
     color: var(--text-accent);
 }
 
-.taskslite-list-item-title .markdown-rendered code {
+.taskslite-list-item-title code,
+.taskslite-list-item-title.markdown-rendered code {
     font-family: var(--font-monospace);
     font-size: 0.88em;
     padding: 0.05rem 0.3rem;
@@ -960,20 +973,24 @@
     color: var(--text-normal);
 }
 
-.taskslite-list-item-title .markdown-rendered strong {
+.taskslite-list-item-title strong,
+.taskslite-list-item-title.markdown-rendered strong {
     font-weight: 600;
 }
 
-.taskslite-list-item-title .markdown-rendered em {
+.taskslite-list-item-title em,
+.taskslite-list-item-title.markdown-rendered em {
     font-style: italic;
 }
 
-.taskslite-list-item-title .markdown-rendered s {
+.taskslite-list-item-title s,
+.taskslite-list-item-title.markdown-rendered s {
     text-decoration: line-through;
     color: var(--text-muted);
 }
 
-.taskslite-list-item-title .markdown-rendered mark {
+.taskslite-list-item-title mark,
+.taskslite-list-item-title.markdown-rendered mark {
     background: color-mix(in srgb, var(--text-accent) 20%, transparent);
     padding: 0 0.15rem;
     border-radius: 2px;
