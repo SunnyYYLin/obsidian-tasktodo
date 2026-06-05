@@ -450,6 +450,18 @@ export class TaskTodoTaskListView extends ItemView {
       item.path,
       this,
     );
+    // Prevent double-triggering jump when clicking on links/tags inside markdown
+    titleDiv.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement;
+      if (
+        target.closest("a") ||
+        target.closest(".tag") ||
+        target.closest(".internal-link") ||
+        target.closest(".external-link")
+      ) {
+        event.stopPropagation();
+      }
+    });
   }
 
   private renderItemDates(container: HTMLElement, item: TaskListItem): void {
