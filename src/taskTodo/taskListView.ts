@@ -1,5 +1,6 @@
 import {
   ItemView,
+  MarkdownRenderer,
   Menu,
   Modal,
   Notice,
@@ -151,7 +152,7 @@ export class TaskTodoTaskListView extends ItemView {
         this.collapsedGroups,
         this.host,
       )) {
-        this.renderGroup(layout, group, showCompleted);
+        await this.renderGroup(layout, group, showCompleted);
       }
     }
   }
@@ -221,11 +222,11 @@ export class TaskTodoTaskListView extends ItemView {
     );
   }
 
-  private renderGroup(
+  private async renderGroup(
     container: HTMLElement,
     group: TaskGroup,
     showCompleted: boolean,
-  ): void {
+  ): Promise<void> {
     const section = container.createEl("section", {
       cls: "taskslite-list-section",
     });
@@ -248,15 +249,15 @@ export class TaskTodoTaskListView extends ItemView {
     if (group.collapsed) return;
     const list = section.createDiv({ cls: "taskslite-task-list" });
     for (const item of group.items) {
-      this.renderTaskItem(list, item, showCompleted);
+      await this.renderTaskItem(list, item, showCompleted);
     }
   }
 
-  private renderTaskItem(
+  private async renderTaskItem(
     container: HTMLElement,
     item: TaskListItem,
     showCompleted: boolean,
-  ): void {
+  ): Promise<void> {
     const wrapper = container.createDiv({ cls: "taskslite-list-item-wrapper" });
     const row = wrapper.createDiv({ cls: "taskslite-list-item" });
     row.dataset.taskStatusType = item.task.status;
@@ -295,7 +296,7 @@ export class TaskTodoTaskListView extends ItemView {
     });
 
     const body = row.createDiv({ cls: "taskslite-list-item-body" });
-    this.renderItemTitle(body, item);
+    await this.renderItemTitle(body, item);
     this.renderItemDates(body, item);
     this.renderItemContext(body, item);
     this.renderItemMetadata(body, item);
@@ -413,11 +414,14 @@ export class TaskTodoTaskListView extends ItemView {
     });
 
     if (item.hasChildren && this.expandedTasks.has(taskKey(item))) {
-      this.renderChildList(wrapper, item, showCompleted);
+      await this.renderChildList(wrapper, item, showCompleted);
     }
   }
 
-  private renderItemTitle(container: HTMLElement, item: TaskListItem): void {
+  private async renderItemTitle(
+    container: HTMLElement,
+    item: TaskListItem,
+  ): Promise<void> {
     const titleRow = container.createDiv({
       cls: "taskslite-list-item-title-row",
     });
@@ -440,7 +444,13 @@ export class TaskTodoTaskListView extends ItemView {
       });
     }
     const titleDiv = titleRow.createDiv({ cls: "taskslite-list-item-title" });
-    renderInlineMarkdown(titleDiv, item.task.description);
+    await MarkdownRenderer.render(
+      this.appRef,
+      item.task.description,
+      titleDiv,
+      item.path,
+      this,
+    );
   }
 
   private renderItemDates(container: HTMLElement, item: TaskListItem): void {
@@ -544,11 +554,11 @@ export class TaskTodoTaskListView extends ItemView {
     });
   }
 
-  private renderChildList(
+  private async renderChildList(
     container: HTMLElement,
     item: TaskListItem,
     showCompleted: boolean,
-  ): void {
+  ): Promise<void> {
     let children = item.children.filter((child) => isVisibleTask(child));
     if (!showCompleted) {
       children = children.filter((child) => child.task.status !== "DONE");
@@ -557,7 +567,7 @@ export class TaskTodoTaskListView extends ItemView {
 
     const list = container.createDiv({ cls: "taskslite-child-list" });
     for (const child of children) {
-      this.renderTaskItem(list, child, showCompleted);
+      await this.renderTaskItem(list, child, showCompleted);
     }
   }
 
@@ -898,83 +908,6 @@ function formatSmartDate(
   }
 
   return { text: `${symbol} ${label}`, cssClass };
-}
-
-function renderInlineMarkdown(container: HTMLElement, text: string): void {
-  // Process patterns in order of priority. Use regex to find matches and build DOM nodes.
-  // Pattern: [[link|display]] or [[link]] | [text](url) | **bold** | *italic* | `code` | #tag
-  const pattern =
-    /(\[\[[^\]|]+(?:\|[^\]]+)?\]\])|(\[[^\]]+\]\([^)]+\))|(\*\*[^*]+\*\*)|(\*[^*]+\*)|(`[^`]+`)|(#[^\s!@#$%^&*(),.?":{}|<>]+)/g;
-
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(text)) !== null) {
-    // Add text before match
-    if (match.index > lastIndex) {
-      container.createSpan({ text: text.slice(lastIndex, match.index) });
-    }
-
-    const full = match[0];
-
-    if (full.startsWith("[[")) {
-      // Wiki link
-      const inner = full.slice(2, -2);
-      const parts = inner.split("|");
-      const display = parts.length > 1 ? parts[1]! : parts[0]!;
-      const linkTarget = parts[0]!;
-      const el = container.createSpan({
-        cls: "taskslite-wiki-link",
-        text: display,
-      });
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        // Use Obsidian's workspace to open the link
-        const app = (window as any).app;
-        if (app) {
-          app.workspace.openLinkText(linkTarget, "", false);
-        }
-      });
-    } else if (full.startsWith("[")) {
-      // Inline link [text](url)
-      const linkMatch = full.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-      if (linkMatch) {
-        const el = container.createEl("a", {
-          cls: "taskslite-inline-link",
-          text: linkMatch[1],
-          href: linkMatch[2],
-        });
-        el.addEventListener("click", (e) => {
-          e.stopPropagation();
-          window.open(linkMatch[2], "_blank");
-        });
-      }
-    } else if (full.startsWith("**")) {
-      container.createEl("strong", {
-        cls: "taskslite-inline-bold",
-        text: full.slice(2, -2),
-      });
-    } else if (full.startsWith("*")) {
-      container.createEl("em", {
-        cls: "taskslite-inline-italic",
-        text: full.slice(1, -1),
-      });
-    } else if (full.startsWith("`")) {
-      container.createEl("code", {
-        cls: "taskslite-inline-code",
-        text: full.slice(1, -1),
-      });
-    } else if (full.startsWith("#")) {
-      container.createSpan({ cls: "taskslite-tag", text: full });
-    }
-
-    lastIndex = match.index + full.length;
-  }
-
-  // Add remaining text
-  if (lastIndex < text.length) {
-    container.createSpan({ text: text.slice(lastIndex) });
-  }
 }
 
 function taskKey(item: Pick<TaskListItem, "path" | "lineNumber">): string {
