@@ -530,10 +530,16 @@ export class TaskTodoTaskListView extends ItemView {
     // Toggle button (always collapsed by default)
     const toggle = wrapper.createEl("button", {
       cls: "taskslite-metadata-toggle",
-      attr: { "aria-expanded": "false" },
+      attr: {
+        "aria-label": t("task.metadata.label"),
+        "aria-expanded": "false",
+      },
     });
+    const toggleIcon = toggle.createSpan({ cls: "taskslite-metadata-toggle-icon" });
+    setIcon(toggleIcon, "chevron-right");
     toggle.createSpan({
-      text: `\u25b8 ${t("task.metadata.label")} (${parts.length})`,
+      text: `${t("task.metadata.label")} (${parts.length})`,
+      cls: "taskslite-metadata-toggle-text",
     });
 
     // Content area (hidden by default)
@@ -546,10 +552,8 @@ export class TaskTodoTaskListView extends ItemView {
       e.stopPropagation();
       const expanded = toggle.getAttribute("aria-expanded") === "true";
       toggle.setAttribute("aria-expanded", String(!expanded));
-      toggle.empty();
-      toggle.createSpan({
-        text: `${expanded ? "\u25b8" : "\u25be"} ${t("task.metadata.label")} (${parts.length})`,
-      });
+      toggleIcon.empty();
+      setIcon(toggleIcon, expanded ? "chevron-right" : "chevron-down");
       content.toggleClass("taskslite-metadata-expanded", !expanded);
     });
   }
