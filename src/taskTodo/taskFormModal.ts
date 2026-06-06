@@ -289,6 +289,20 @@ export class TaskFormModal extends Modal {
 					}
 					this.formData[key] = combineDateTime(dVal, timeVal);
 				});
+			})
+			.addExtraButton((button) => {
+				button
+					.setIcon("x")
+					.setTooltip(t("common.clear") || "Clear")
+					.onClick(() => {
+						if (dateInput) {
+							dateInput.value = "";
+						}
+						if (timeInput) {
+							timeInput.value = "";
+						}
+						this.formData[key] = null;
+					});
 			});
 	}
 
