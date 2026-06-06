@@ -1176,43 +1176,43 @@
 /* Stylize date and time inputs inside taskslite modal to match Obsidian style */
 .taskslite-modal input[type="date"],
 .taskslite-modal input[type="time"] {
-    background-color: var(--background-modifier-form-field) !important;
-    border: 1px solid var(--background-modifier-border) !important;
-    color: var(--text-normal) !important;
-    font-family: var(--font-interface) !important;
-    font-size: var(--font-ui-small) !important;
-    border-radius: var(--input-radius, 4px) !important;
-    padding: var(--size-4-1) var(--size-4-2) !important;
-    height: var(--input-height, 30px) !important;
-    line-height: var(--line-height-normal) !important;
-    box-shadow: none !important;
-    box-sizing: border-box !important;
+    background-color: var(--background-modifier-form-field);
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-normal);
+    font-family: var(--font-interface);
+    font-size: var(--font-ui-small);
+    border-radius: var(--input-radius, 4px);
+    padding: var(--size-4-1) var(--size-4-2);
+    height: var(--input-height, 30px);
+    line-height: var(--line-height-normal);
+    box-shadow: none;
+    box-sizing: border-box;
 }
 
 .taskslite-modal input[type="date"]:hover,
 .taskslite-modal input[type="time"]:hover {
-    border-color: var(--background-modifier-border-hover) !important;
+    border-color: var(--background-modifier-border-hover);
 }
 
 .taskslite-modal input[type="date"]:focus,
 .taskslite-modal input[type="time"]:focus {
-    border-color: var(--background-modifier-border-focus) !important;
-    outline: none !important;
+    border-color: var(--background-modifier-border-focus);
+    outline: none;
 }
 
 /* Specific widths for date and time inputs to align and look compact */
 .taskslite-modal .taskslite-modal-date-input {
-    width: 115px !important;
-    min-width: 115px !important;
-    max-width: 115px !important;
-    flex: 0 0 115px !important;
+    width: 120px !important;
+    min-width: 120px !important;
+    max-width: 120px !important;
+    flex: 0 0 120px !important;
 }
 
 .taskslite-modal .taskslite-modal-time-input {
-    width: 75px !important;
-    min-width: 75px !important;
-    max-width: 75px !important;
-    flex: 0 0 75px !important;
+    width: 80px !important;
+    min-width: 80px !important;
+    max-width: 80px !important;
+    flex: 0 0 80px !important;
     margin-left: 8px !important;
 }
 
