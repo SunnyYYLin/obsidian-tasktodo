@@ -1202,17 +1202,17 @@
 
 /* Specific widths for date and time inputs to align and look compact */
 .taskslite-modal .taskslite-modal-date-input {
-    width: 130px !important;
-    min-width: 130px !important;
-    max-width: 130px !important;
-    flex: 0 0 130px !important;
+    width: 115px !important;
+    min-width: 115px !important;
+    max-width: 115px !important;
+    flex: 0 0 115px !important;
 }
 
 .taskslite-modal .taskslite-modal-time-input {
-    width: 90px !important;
-    min-width: 90px !important;
-    max-width: 90px !important;
-    flex: 0 0 90px !important;
+    width: 75px !important;
+    min-width: 75px !important;
+    max-width: 75px !important;
+    flex: 0 0 75px !important;
     margin-left: 8px !important;
 }
 
@@ -1221,7 +1221,16 @@
 .taskslite-modal input[type="time"]::-webkit-calendar-picker-indicator {
     cursor: pointer;
     opacity: 0.6;
-    filter: var(--theme-dark-filter, invert(1)); /* Invert icon color to white in dark mode */
+}
+
+.theme-dark .taskslite-modal input[type="date"]::-webkit-calendar-picker-indicator,
+.theme-dark .taskslite-modal input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) !important;
+}
+
+.theme-light .taskslite-modal input[type="date"]::-webkit-calendar-picker-indicator,
+.theme-light .taskslite-modal input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: none !important;
 }
 
 .taskslite-modal input[type="date"]::-webkit-calendar-picker-indicator:hover,
