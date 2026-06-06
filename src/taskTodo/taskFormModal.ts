@@ -9,11 +9,13 @@ export interface TaskFormData {
 	startDate: string | null;
 	scheduledDate: string | null;
 	dueDate: string | null;
+	remindDate: string | null;
 	recurrence: string | null;
 	onCompletion: string | null;
 	id: string | null;
 	dependsOn: string | null;
 	assignee: string[];
+	isFileTask?: boolean;
 }
 
 class TargetFileSuggestModal extends SuggestModal<string> {
@@ -91,11 +93,13 @@ export class TaskFormModal extends Modal {
 			startDate: task?.dates.start || null,
 			scheduledDate: task?.dates.scheduled || null,
 			dueDate: task?.dates.due || null,
+			remindDate: task?.dates.remind || null,
 			recurrence: task?.recurrence || null,
 			onCompletion: task?.onCompletion || null,
 			id: task?.id || null,
 			dependsOn: task?.dependsOn || null,
 			assignee: task?.assignee || [],
+			isFileTask: false,
 		};
 
 		this.targetFileValue = initialData?.path?.replace(/\.md$/iu, "") || "Tasks";
@@ -117,6 +121,7 @@ export class TaskFormModal extends Modal {
 		// 2. Target File (Create Mode Only)
 		if (this.mode === "create" && !this.initialData?.parentLineNumber) {
 			this.addTargetFileSetting(this.contentEl);
+			this.addFileTaskSetting(this.contentEl);
 		}
 
 		// 3. Status (Edit Mode Only)
@@ -131,6 +136,7 @@ export class TaskFormModal extends Modal {
 		this.addDateSetting(`${TASK_SYMBOLS.start} ${t("modal.startDate")}`, "startDate");
 		this.addDateSetting(`${TASK_SYMBOLS.scheduled} ${t("modal.scheduledDate")}`, "scheduledDate");
 		this.addDateSetting(`${TASK_SYMBOLS.due} ${t("modal.dueDate")}`, "dueDate");
+		this.addDateSetting(`${TASK_SYMBOLS.remind} ${t("modal.remindDate")}`, "remindDate");
 
 		// 6. Recurrence & OnCompletion dropdowns
 		this.addRecurrenceSetting(this.contentEl);
@@ -243,14 +249,47 @@ export class TaskFormModal extends Modal {
 		});
 	}
 
-	private addDateSetting(name: string, key: "startDate" | "scheduledDate" | "dueDate"): void {
-		new Setting(this.contentEl).setName(name).setClass("taskslite-modal-setting-compact").addText((text) => {
-			text.inputEl.type = "date";
-			text.inputEl.addClass("taskslite-modal-date-input", "taskslite-modal-compact-control");
-			text.setValue(this.formData[key] || "").onChange((value) => {
-				this.formData[key] = value || null;
+	private addFileTaskSetting(container: HTMLElement): void {
+		new Setting(container)
+			.setName(t("modal.isFileTask") || "File task")
+			.setDesc(t("modal.isFileTaskDesc") || "Create as file-level metadata task in YAML frontmatter")
+			.addToggle((toggle) => {
+				toggle.setValue(!!this.formData.isFileTask).onChange((value) => {
+					this.formData.isFileTask = value;
+				});
 			});
-		});
+	}
+
+	private addDateSetting(name: string, key: "startDate" | "scheduledDate" | "dueDate" | "remindDate"): void {
+		const parsed = splitDateTime(this.formData[key]);
+		let dateInput: HTMLInputElement;
+		let timeInput: HTMLInputElement;
+
+		new Setting(this.contentEl)
+			.setName(name)
+			.setClass("taskslite-modal-setting-compact")
+			.addText((text) => {
+				dateInput = text.inputEl;
+				text.inputEl.type = "date";
+				text.inputEl.addClass("taskslite-modal-date-input", "taskslite-modal-compact-control");
+				text.setValue(parsed.date).onChange((dateVal) => {
+					const tVal = timeInput?.value || "";
+					this.formData[key] = combineDateTime(dateVal, tVal);
+				});
+			})
+			.addText((text) => {
+				timeInput = text.inputEl;
+				text.inputEl.type = "time";
+				text.inputEl.addClass("taskslite-modal-time-input", "taskslite-modal-compact-control");
+				text.setValue(parsed.time).onChange((timeVal) => {
+					let dVal = dateInput?.value || "";
+					if (!dVal && timeVal) {
+						dVal = window.moment().format("YYYY-MM-DD");
+						if (dateInput) dateInput.value = dVal;
+					}
+					this.formData[key] = combineDateTime(dVal, timeVal);
+				});
+			});
 	}
 
 	private addRecurrenceSetting(container: HTMLElement): void {
@@ -348,4 +387,26 @@ function targetFilePath(basePath: string, value: string): string {
 
 function normalizeFolderPath(value: string): string {
 	return value.trim().replace(/\\/gu, "/").replace(/^\/+|\/+$/gu, "");
+}
+
+function splitDateTime(dateTimeStr: string | null): { date: string; time: string } {
+	if (!dateTimeStr) return { date: "", time: "" };
+	const m = window.moment(dateTimeStr, ["YYYY-MM-DD HH:mm:ss", "YYYY-MM-DD HH:mm", "YYYY-MM-DD h:mma", "YYYY-MM-DD"], true);
+	if (!m.isValid()) {
+		const parts = dateTimeStr.split(" ");
+		const datePart = parts[0] || "";
+		const timePart = parts[1] || "";
+		return { date: datePart, time: timePart };
+	}
+	const hasTime = dateTimeStr.length > 10 && dateTimeStr.includes(":");
+	return {
+		date: m.format("YYYY-MM-DD"),
+		time: hasTime ? m.format("HH:mm") : "",
+	};
+}
+
+function combineDateTime(date: string, time: string): string | null {
+	if (!date) return null;
+	if (!time) return date;
+	return `${date} ${time}`;
 }

@@ -13,6 +13,7 @@ export interface TaskTodoTaskLine {
 		due: string | null;
 		done: string | null;
 		cancelled: string | null;
+		remind: string | null;
 	};
 	recurrence: string | null;
 	onCompletion: string | null;
@@ -40,6 +41,7 @@ export interface CreateTaskInput {
 		start?: string | null;
 		scheduled?: string | null;
 		due?: string | null;
+		remind?: string | null;
 	};
 	recurrence?: string | null;
 	onCompletion?: string | null;
@@ -48,6 +50,7 @@ export interface CreateTaskInput {
 	assignee?: string[];
 	path?: string;
 	parentLineNumber?: number;
+	isFileTask?: boolean;
 }
 
 /** Partial patch for task metadata fields. Omitted keys are left unchanged. */
@@ -58,6 +61,7 @@ export interface EditTaskPatch {
 		start?: string | null;
 		scheduled?: string | null;
 		due?: string | null;
+		remind?: string | null;
 	};
 	recurrence?: string | null;
 	onCompletion?: string | null;

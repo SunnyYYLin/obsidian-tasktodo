@@ -21,6 +21,7 @@ export const TASK_SYMBOLS = {
 	dependsOn: "⛔",
 	id: "🆔",
 	assignee: "👤",
+	remind: "⏰",
 } as const;
 
 export function serializeTaskLine(task: TaskTodoTaskLine, registry: { getByType(type: string): { symbol: string } }): string {
@@ -36,6 +37,7 @@ export function serializeTaskLine(task: TaskTodoTaskLine, registry: { getByType(
 	addDate(parts, TASK_SYMBOLS.due, task.dates.due);
 	addDate(parts, TASK_SYMBOLS.done, task.dates.done);
 	addDate(parts, TASK_SYMBOLS.cancelled, task.dates.cancelled);
+	addDate(parts, TASK_SYMBOLS.remind, task.dates.remind);
 	if (task.recurrence) parts.push(`${TASK_SYMBOLS.recurrence} ${task.recurrence}`);
 	if (task.onCompletion) parts.push(`${TASK_SYMBOLS.onCompletion} ${task.onCompletion}`);
 	if (task.dependsOn) parts.push(`${TASK_SYMBOLS.dependsOn} ${task.dependsOn}`);

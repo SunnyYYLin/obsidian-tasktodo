@@ -17,7 +17,7 @@ export interface TaskListItem {
 }
 
 export function shiftDate(value: string, amount: number): string {
-	return (window as any).moment(value, "YYYY-MM-DD").add(amount, "days").format("YYYY-MM-DD");
+	return window.moment(value, "YYYY-MM-DD").add(amount, "days").format("YYYY-MM-DD");
 }
 
 export function matchFilter(item: TaskListItem, filter: FilterConfig): boolean {
@@ -176,8 +176,8 @@ function extractPeople(description: string): string[] {
 export function preprocessDQLQuery(query: string): string {
 	if (!query) return query;
 	const today = todayString();
-	const tomorrow = (window as any).moment(today, "YYYY-MM-DD").add(1, "days").format("YYYY-MM-DD");
-	const nextWeek = (window as any).moment(today, "YYYY-MM-DD").add(7, "days").format("YYYY-MM-DD");
+	const tomorrow = window.moment(today, "YYYY-MM-DD").add(1, "days").format("YYYY-MM-DD");
+	const nextWeek = window.moment(today, "YYYY-MM-DD").add(7, "days").format("YYYY-MM-DD");
 
 	let result = query;
 	result = result.replace(/\bdate\(\s*["']?tomorrow["']?\s*\)/gi, `date("${tomorrow}")`);

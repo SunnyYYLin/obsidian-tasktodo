@@ -466,7 +466,8 @@ export class TaskTodoTaskListView extends ItemView {
         | "start"
         | "done"
         | "created"
-        | "cancelled";
+        | "cancelled"
+        | "remind";
     }> = [];
     if (item.task.dates.start)
       datesData.push({ dateStr: item.task.dates.start, dateType: "start" });
@@ -477,6 +478,8 @@ export class TaskTodoTaskListView extends ItemView {
       });
     if (item.task.dates.due)
       datesData.push({ dateStr: item.task.dates.due, dateType: "due" });
+    if (item.task.dates.remind)
+      datesData.push({ dateStr: item.task.dates.remind, dateType: "remind" });
     if (item.task.dates.cancelled)
       datesData.push({ dateStr: item.task.dates.cancelled, dateType: "cancelled" });
     if (item.task.dates.done)
@@ -663,6 +666,7 @@ export class TaskTodoTaskListView extends ItemView {
               start: data.startDate || null,
               scheduled: data.scheduledDate || null,
               due: data.dueDate || null,
+              remind: data.remindDate || null,
             },
             recurrence: data.recurrence || null,
             onCompletion: data.onCompletion || null,
@@ -670,6 +674,7 @@ export class TaskTodoTaskListView extends ItemView {
             dependsOn: data.dependsOn || null,
             assignee: data.assignee,
             path: targetPath || "Tasks.md",
+            isFileTask: data.isFileTask,
           };
           try {
             await this.host.api.createTask(input);
@@ -700,6 +705,7 @@ export class TaskTodoTaskListView extends ItemView {
               start: data.startDate || null,
               scheduled: data.scheduledDate || null,
               due: data.dueDate || null,
+              remind: data.remindDate || null,
             },
             recurrence: data.recurrence || null,
             onCompletion: data.onCompletion || null,
@@ -737,6 +743,7 @@ export class TaskTodoTaskListView extends ItemView {
               start: data.startDate || null,
               scheduled: data.scheduledDate || null,
               due: data.dueDate || null,
+              remind: data.remindDate || null,
             },
             recurrence: data.recurrence || null,
             onCompletion: data.onCompletion || null,
@@ -898,9 +905,9 @@ interface FormattedDateResult {
 
 function formatSmartDate(
   dateStr: string,
-  dateType: "due" | "scheduled" | "start" | "done" | "created" | "cancelled",
+  dateType: "due" | "scheduled" | "start" | "done" | "created" | "cancelled" | "remind",
 ): FormattedDateResult {
-  const m = (window as any).moment;
+  const m = window.moment;
   const today = m().startOf("day");
   // Use flexible parsing to support both YYYY-MM-DD and YYYY-MM-DD HH:mm:ss
   const date = m(dateStr).startOf("day");
@@ -917,7 +924,9 @@ function formatSmartDate(
             ? "check-square"
             : dateType === "created"
               ? "plus-circle"
-              : "circle-slash";
+              : dateType === "remind"
+                ? "bell"
+                : "circle-slash";
 
   // 1. Get Date Type Suffix (e.g. 截止 / 计划 / 开始 / 完成 / 取消 / 创建)
   const typeKey = `task.date.${dateType}` as I18nKey;
@@ -968,7 +977,7 @@ function formatSmartDate(
     else if (diff > 0) cssClass = "soon";
     else cssClass = "future";
   } else {
-    // due / scheduled
+    // due / scheduled / remind
     if (diff < 0) {
       cssClass = "overdue";
     } else if (diff === 0) {
