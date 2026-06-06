@@ -301,28 +301,7 @@ export class TaskTodoTaskListView extends ItemView {
     this.renderItemDates(meta, item);
     this.renderItemDetails(meta, item);
 
-    row.addEventListener("click", () => {
-      if (item.depth === -1) {
-        const file = this.appRef.vault.getAbstractFileByPath(item.path);
-        if (file) {
-          const parentFolder = file.parent;
-          if (parentFolder) {
-            const fileExplorer = (this.appRef as any).internalPlugins?.plugins?.["file-explorer"];
-            if (fileExplorer && fileExplorer.enabled) {
-              fileExplorer.instance.revealInFolder(parentFolder);
-            }
-          }
-        }
-      } else {
-        const file = this.appRef.vault.getAbstractFileByPath(item.path);
-        if (file instanceof TFile) {
-          const leaf = this.appRef.workspace.getLeaf(false);
-          void leaf.openFile(file, {
-            eState: { line: item.lineNumber },
-          });
-        }
-      }
-    });
+
 
     row.addEventListener("contextmenu", (event) => {
       event.preventDefault();
@@ -533,21 +512,9 @@ export class TaskTodoTaskListView extends ItemView {
       if (idx > 0) {
         breadcrumb.createSpan({ text: " / ", cls: "breadcrumb-separator" });
       }
-      const folderPath = folders.slice(0, idx + 1).join("/");
-      const folderEl = breadcrumb.createSpan({
+      breadcrumb.createSpan({
         text: folder,
         cls: "breadcrumb-folder",
-      });
-      folderEl.addEventListener("click", (event) => {
-        event.stopPropagation();
-        event.preventDefault();
-        const abstractFolder = this.appRef.vault.getAbstractFileByPath(folderPath);
-        if (abstractFolder) {
-          const fileExplorer = (this.appRef as any).internalPlugins?.plugins?.["file-explorer"];
-          if (fileExplorer && fileExplorer.enabled) {
-            fileExplorer.instance.revealInFolder(abstractFolder);
-          }
-        }
       });
     });
 
@@ -561,15 +528,6 @@ export class TaskTodoTaskListView extends ItemView {
         cls: "breadcrumb-file",
       });
       fileEl.setAttribute("title", item.path);
-      fileEl.addEventListener("click", (event) => {
-        event.stopPropagation();
-        event.preventDefault();
-        const file = this.appRef.vault.getAbstractFileByPath(item.path);
-        if (file instanceof TFile) {
-          const leaf = this.appRef.workspace.getLeaf(false);
-          void leaf.openFile(file, { eState: { line: 0 } });
-        }
-      });
 
       // 3. Render parent tasks
       const parentTasks: TaskListItem[] = [];
@@ -581,21 +539,36 @@ export class TaskTodoTaskListView extends ItemView {
 
       parentTasks.forEach((parent) => {
         breadcrumb.createSpan({ text: " › ", cls: "breadcrumb-arrow" });
-        const parentEl = breadcrumb.createSpan({
+        breadcrumb.createSpan({
           text: parent.task.description,
           cls: "breadcrumb-parent-task",
         });
-        parentEl.addEventListener("click", (event) => {
-          event.stopPropagation();
-          event.preventDefault();
-          const file = this.appRef.vault.getAbstractFileByPath(parent.path);
-          if (file instanceof TFile) {
-            const leaf = this.appRef.workspace.getLeaf(false);
-            void leaf.openFile(file, { eState: { line: parent.lineNumber } });
-          }
-        });
       });
     }
+
+    // Unified click listener for the entire breadcrumb link to navigate to the task location
+    breadcrumb.addEventListener("click", (event) => {
+      event.stopPropagation();
+      event.preventDefault();
+      if (item.depth === -1) {
+        const file = this.appRef.vault.getAbstractFileByPath(item.path);
+        if (file) {
+          const parentFolder = file.parent;
+          if (parentFolder) {
+            const fileExplorer = (this.appRef as any).internalPlugins?.plugins?.["file-explorer"];
+            if (fileExplorer && fileExplorer.enabled) {
+              fileExplorer.instance.revealInFolder(parentFolder);
+            }
+          }
+        }
+      } else {
+        const file = this.appRef.vault.getAbstractFileByPath(item.path);
+        if (file instanceof TFile) {
+          const leaf = this.appRef.workspace.getLeaf(false);
+          void leaf.openFile(file, { eState: { line: item.lineNumber } });
+        }
+      }
+    });
 
     // 4. Render other metadata
     // Assignee

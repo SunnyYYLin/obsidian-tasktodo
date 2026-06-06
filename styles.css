@@ -216,7 +216,7 @@
     border-radius: 6px;
     background: var(--background-secondary);
     box-shadow: 0 1px 4px rgb(0 0 0 / 5%);
-    cursor: pointer;
+    cursor: default;
     transition: background-color 0.15s ease, border-left-color 0.15s ease, opacity 0.15s ease;
 }
 
@@ -430,25 +430,22 @@
     flex-wrap: wrap;
     color: var(--text-muted);
     font-size: 0.8rem;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.taskslite-breadcrumb:hover {
+    color: var(--text-accent);
+}
+
+.taskslite-breadcrumb:hover .breadcrumb-icon {
+    color: var(--text-accent);
 }
 
 .taskslite-breadcrumb .breadcrumb-icon {
     font-size: 0.9rem;
     margin-right: 0.15rem;
-}
-
-.taskslite-breadcrumb .breadcrumb-folder,
-.taskslite-breadcrumb .breadcrumb-file,
-.taskslite-breadcrumb .breadcrumb-parent-task {
-    cursor: pointer;
-    transition: color 0.15s ease, text-decoration 0.15s ease;
-}
-
-.taskslite-breadcrumb .breadcrumb-folder:hover,
-.taskslite-breadcrumb .breadcrumb-file:hover,
-.taskslite-breadcrumb .breadcrumb-parent-task:hover {
-    color: var(--text-accent);
-    text-decoration: underline;
+    transition: color 0.15s ease;
 }
 
 .taskslite-breadcrumb .breadcrumb-separator {
