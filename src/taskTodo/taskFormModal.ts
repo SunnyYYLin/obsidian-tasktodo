@@ -1,4 +1,4 @@
-import { App, Modal, Setting, SuggestModal, type TextComponent } from "obsidian";
+import { App, Modal, Setting, SuggestModal, TFolder, type TextComponent } from "obsidian";
 import { t } from "../i18n";
 import { TASK_SYMBOLS, type TaskTodoHost, type TaskTodoTaskLine } from "../taskLiteInterop";
 
@@ -24,9 +24,11 @@ class TargetFileSuggestModal extends SuggestModal<string> {
 		private readonly values: string[],
 		private readonly initialQuery: string,
 		private readonly onChoose: (value: string) => void,
+		private readonly placeholderText?: string,
+		private readonly isFolderMode = false,
 	) {
 		super(app);
-		this.setPlaceholder(t("modal.filePlaceholder"));
+		this.setPlaceholder(placeholderText || t("modal.filePlaceholder"));
 		this.inputEl.value = initialQuery;
 	}
 
@@ -48,9 +50,10 @@ class TargetFileSuggestModal extends SuggestModal<string> {
 			const path = value.slice("CREATE_NEW_FILE:".length);
 			el.addClass("taskslite-suggest-item");
 			el.createSpan({ text: "+ ", cls: "taskslite-suggest-new-icon" });
-			el.createSpan({ text: t("modal.createFile").replace("{path}", path) });
+			const label = this.isFolderMode ? `Create folder: "${path}"` : t("modal.createFile").replace("{path}", path);
+			el.createSpan({ text: label });
 		} else {
-			el.setText(value);
+			el.setText(value || "/ (Root)");
 		}
 	}
 
@@ -67,6 +70,8 @@ class TargetFileSuggestModal extends SuggestModal<string> {
 export class TaskFormModal extends Modal {
 	private readonly formData: TaskFormData;
 	private targetFileValue: string;
+	private targetFolderValue: string;
+	private targetPathContainer?: HTMLDivElement;
 	private resolved = false;
 
 	constructor(
@@ -102,7 +107,12 @@ export class TaskFormModal extends Modal {
 			isFileTask: false,
 		};
 
-		this.targetFileValue = initialData?.path?.replace(/\.md$/iu, "") || "Tasks";
+		const initialPath = initialData?.path || "Tasks.md";
+		const initialPathNoExt = initialPath.replace(/\.md$/iu, "");
+		this.targetFileValue = initialPathNoExt;
+
+		const lastSlash = initialPathNoExt.lastIndexOf("/");
+		this.targetFolderValue = lastSlash !== -1 ? initialPathNoExt.slice(0, lastSlash) : "";
 	}
 
 	onOpen(): void {
@@ -118,10 +128,11 @@ export class TaskFormModal extends Modal {
 			window.setTimeout(() => text.inputEl.focus(), 0);
 		});
 
-		// 2. Target File (Create Mode Only)
+		// 2. File Task and Target Path (Create Mode Only)
 		if (this.mode === "create" && !this.initialData?.parentLineNumber) {
-			this.addTargetFileSetting(this.contentEl);
 			this.addFileTaskSetting(this.contentEl);
+			this.targetPathContainer = this.contentEl.createDiv();
+			this.renderTargetPathSetting();
 		}
 
 		// 3. Status (Edit Mode Only)
@@ -256,8 +267,67 @@ export class TaskFormModal extends Modal {
 			.addToggle((toggle) => {
 				toggle.setValue(!!this.formData.isFileTask).onChange((value) => {
 					this.formData.isFileTask = value;
+					this.renderTargetPathSetting();
 				});
 			});
+	}
+
+	private renderTargetPathSetting(): void {
+		if (!this.targetPathContainer) return;
+		this.targetPathContainer.empty();
+
+		if (this.formData.isFileTask) {
+			this.addTargetFolderSetting(this.targetPathContainer);
+		} else {
+			this.addTargetFileSetting(this.targetPathContainer);
+		}
+	}
+
+	private addTargetFolderSetting(container: HTMLElement): void {
+		const values = targetFolderOptions(this.app, "");
+		let input: TextComponent | null = null;
+		new Setting(container).setName(t("modal.folder")).addText((text) => {
+			input = text;
+			text.inputEl.readOnly = true;
+			text.inputEl.addClass("taskslite-file-input");
+			text.inputEl.setAttr("autocomplete", "off");
+			text.inputEl.setAttr("autocorrect", "off");
+			text.inputEl.setAttr("autocapitalize", "none");
+			text.inputEl.setAttr("spellcheck", "false");
+			text.setValue(this.targetFolderValue || "/");
+			text.inputEl.addEventListener("click", () => {
+				const query = input?.getValue() === "/" ? "" : (input?.getValue() ?? "");
+				new TargetFileSuggestModal(
+					this.app,
+					values,
+					query,
+					(value) => {
+						this.targetFolderValue = value;
+						input?.setValue(value || "/");
+					},
+					t("modal.folderPlaceholder"),
+					true,
+				).open();
+			});
+		}).addExtraButton((button) => {
+			button
+				.setIcon("folder-open")
+				.setTooltip(t("modal.chooseFolder"))
+				.onClick(() => {
+					const query = input?.getValue() === "/" ? "" : (input?.getValue() ?? "");
+					new TargetFileSuggestModal(
+						this.app,
+						values,
+						query,
+						(value) => {
+							this.targetFolderValue = value;
+							input?.setValue(value || "/");
+						},
+						t("modal.folderPlaceholder"),
+						true,
+					).open();
+				});
+		});
 	}
 
 	private addDateSetting(name: string, key: "startDate" | "scheduledDate" | "dueDate" | "remindDate"): void {
@@ -369,7 +439,23 @@ export class TaskFormModal extends Modal {
 		if (this.resolved) return;
 		this.resolved = true;
 		if (data) {
-			const targetPath = targetFilePath("", this.targetFileValue);
+			let targetPath: string;
+			if (data.isFileTask) {
+				const folder = this.targetFolderValue.trim();
+				const description = data.description.trim() || "Untitled Task";
+				const sanitizedDescription = description.replace(/[\\/:*?"<>|]/g, "_");
+				const filename = sanitizedDescription.toLowerCase().endsWith(".md")
+					? sanitizedDescription
+					: `${sanitizedDescription}.md`;
+				
+				if (folder) {
+					targetPath = `${folder}/${filename}`.replace(/\/+/gu, "/");
+				} else {
+					targetPath = filename;
+				}
+			} else {
+				targetPath = targetFilePath("", this.targetFileValue);
+			}
 			this.onSubmit(data, targetPath);
 		}
 		this.close();
@@ -386,6 +472,23 @@ function targetFileOptions(app: App, basePath: string): string[] {
 		.filter((path) => path.startsWith(`${prefix}/`))
 		.map((path) => path.slice(prefix.length + 1).replace(/\.md$/iu, ""))
 		.sort((left, right) => left.localeCompare(right));
+}
+
+function targetFolderOptions(app: App, basePath: string): string[] {
+	const prefix = normalizeFolderPath(basePath);
+	const folders = app.vault.getAllLoadedFiles()
+		.filter((f): f is TFolder => f instanceof TFolder)
+		.map((f) => f.path)
+		.filter((path) => path !== "/");
+	if (!folders.includes("")) {
+		folders.push("");
+	}
+	const prefixLower = prefix.toLowerCase();
+	let filtered = folders;
+	if (prefix) {
+		filtered = folders.filter((path) => path.toLowerCase().startsWith(`${prefixLower}/`));
+	}
+	return filtered.sort((left, right) => left.localeCompare(right));
 }
 
 function targetFilePath(basePath: string, value: string): string {
