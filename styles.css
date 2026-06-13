@@ -1237,3 +1237,10 @@
 .taskslite-modal input[type="time"]::-webkit-calendar-picker-indicator:hover {
     opacity: 1;
 }
+
+.taskslite-has-submenu .menu-item-title::after {
+    content: "›";
+    margin-left: auto;
+    padding-left: 1em;
+    opacity: 0.6;
+}
