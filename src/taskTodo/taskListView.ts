@@ -379,7 +379,39 @@ export class TaskTodoTaskListView extends ItemView {
           });
       });
 
-      // 5. 删除 (Delete)
+      // 5. 推迟 (Postpone)
+      const currentScheduled = item.task.dates.scheduled;
+      if (currentScheduled) {
+        menu.addSeparator();
+        menu.addItem((menuItem) => {
+          menuItem
+            .setTitle(t("task.action.postponeDay"))
+            .setIcon("plus")
+            .onClick(() => {
+              void this.postponeTask(item, currentScheduled, 1);
+            });
+        });
+        menu.addItem((menuItem) => {
+          menuItem
+            .setTitle(t("task.action.postponeTomorrow"))
+            .setIcon("sun")
+            .onClick(() => {
+              const tomorrow = window.moment().add(1, "day").format("YYYY-MM-DD");
+              void this.postponeToDate(item, tomorrow);
+            });
+        });
+        menu.addItem((menuItem) => {
+          menuItem
+            .setTitle(t("task.action.postponeToday"))
+            .setIcon("calendar-check")
+            .onClick(() => {
+              const today = window.moment().format("YYYY-MM-DD");
+              void this.postponeToDate(item, today);
+            });
+        });
+      }
+
+      // 6. 删除 (Delete)
       menu.addItem((menuItem) => {
         menuItem
           .setTitle(t("task.action.delete"))
@@ -553,23 +585,10 @@ export class TaskTodoTaskListView extends ItemView {
     breadcrumb.addEventListener("click", (event) => {
       event.stopPropagation();
       event.preventDefault();
-      if (item.depth === -1) {
-        const file = this.appRef.vault.getAbstractFileByPath(item.path);
-        if (file) {
-          const parentFolder = file.parent;
-          if (parentFolder) {
-            const fileExplorer = (this.appRef as any).internalPlugins?.plugins?.["file-explorer"];
-            if (fileExplorer && fileExplorer.enabled) {
-              fileExplorer.instance.revealInFolder(parentFolder);
-            }
-          }
-        }
-      } else {
-        const file = this.appRef.vault.getAbstractFileByPath(item.path);
-        if (file instanceof TFile) {
-          const leaf = this.appRef.workspace.getLeaf(false);
-          void leaf.openFile(file, { eState: { line: item.lineNumber } });
-        }
+      const file = this.appRef.vault.getAbstractFileByPath(item.path);
+      if (file instanceof TFile) {
+        const leaf = this.appRef.workspace.getLeaf(false);
+        void leaf.openFile(file, { eState: { line: item.lineNumber } });
       }
     });
 
@@ -768,6 +787,30 @@ export class TaskTodoTaskListView extends ItemView {
       },
       { task: item.task },
     ).open();
+  }
+
+  private async postponeTask(item: TaskListItem, currentScheduled: string, days: number): Promise<void> {
+    const m = window.moment(currentScheduled);
+    const newDate = m.add(days, "day").format("YYYY-MM-DD");
+    await this.postponeToDate(item, newDate);
+  }
+
+  private async postponeToDate(item: TaskListItem, newDate: string): Promise<void> {
+    const hasTime = item.task.dates.scheduled && item.task.dates.scheduled.length > 10 && item.task.dates.scheduled.includes(":");
+    let newScheduled: string;
+    if (hasTime) {
+      const timePart = window.moment(item.task.dates.scheduled).format("HH:mm");
+      newScheduled = `${newDate} ${timePart}`;
+    } else {
+      newScheduled = newDate;
+    }
+    const patch: EditTaskPatch = {
+      dates: {
+        scheduled: newScheduled,
+      },
+    };
+    await this.host.api.editTask(item.path, item.lineNumber, patch);
+    await this.render();
   }
 }
 

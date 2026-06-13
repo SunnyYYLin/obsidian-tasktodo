@@ -18,6 +18,44 @@ export interface TaskFormData {
 	isFileTask?: boolean;
 }
 
+class AssigneeSuggestModal extends SuggestModal<string> {
+	constructor(
+		app: App,
+		private readonly knownAssignees: string[],
+		private readonly onChoose: (value: string) => void,
+	) {
+		super(app);
+		this.setPlaceholder(t("modal.assigneePlaceholder") || "Type or choose an assignee");
+	}
+
+	getSuggestions(query: string): string[] {
+		const trimmed = query.trim();
+		if (!trimmed) return this.knownAssignees;
+		const lower = trimmed.toLowerCase();
+		const filtered = this.knownAssignees.filter((a) => a.toLowerCase().includes(lower));
+		const exists = this.knownAssignees.some((a) => a.toLowerCase() === lower);
+		if (!exists && trimmed) {
+			return [`${trimmed}`, ...filtered];
+		}
+		return filtered;
+	}
+
+	renderSuggestion(value: string, el: HTMLElement): void {
+		const isKnown = this.knownAssignees.some((a) => a === value);
+		if (isKnown) {
+			el.setText(value);
+		} else {
+			el.addClass("taskslite-suggest-item");
+			el.createSpan({ text: "+ ", cls: "taskslite-suggest-new-icon" });
+			el.createSpan({ text: value });
+		}
+	}
+
+	onChooseSuggestion(value: string): void {
+		this.onChoose(value);
+	}
+}
+
 class TargetFileSuggestModal extends SuggestModal<string> {
 	constructor(
 		app: App,
@@ -158,7 +196,7 @@ export class TaskFormModal extends Modal {
 		this.addTextSetting(this.contentEl, `${TASK_SYMBOLS.dependsOn} ${t("modal.dependsOn")}`, "id1, id2", "dependsOn");
 
 		// 8. Assignee
-		this.addTextSetting(this.contentEl, `${TASK_SYMBOLS.assignee} ${t("modal.assignee")}`, "John & Mary", "assignee", true);
+		this.addAssigneeSetting(this.contentEl);
 
 		// 9. Save and Cancel Buttons
 		new Setting(this.contentEl)
@@ -267,6 +305,14 @@ export class TaskFormModal extends Modal {
 			.addToggle((toggle) => {
 				toggle.setValue(!!this.formData.isFileTask).onChange((value) => {
 					this.formData.isFileTask = value;
+					if (value) {
+						const lastSlash = this.targetFileValue.lastIndexOf("/");
+						if (lastSlash !== -1) {
+							this.targetFolderValue = this.targetFileValue.slice(0, lastSlash);
+						} else {
+							this.targetFolderValue = "";
+						}
+					}
 					this.renderTargetPathSetting();
 				});
 			});
@@ -433,6 +479,56 @@ export class TaskFormModal extends Modal {
 				}
 			});
 		});
+	}
+
+	private addAssigneeSetting(container: HTMLElement): void {
+		let input: TextComponent | null = null;
+		new Setting(container)
+			.setName(`${TASK_SYMBOLS.assignee} ${t("modal.assignee")}`)
+			.addText((text) => {
+				input = text;
+				text.inputEl.readOnly = true;
+				text.inputEl.addClass("taskslite-file-input");
+				text.inputEl.setAttr("autocomplete", "off");
+				text.inputEl.setAttr("autocorrect", "off");
+				text.inputEl.setAttr("autocapitalize", "none");
+				text.inputEl.setAttr("spellcheck", "false");
+				text.setValue(this.formData.assignee.join(" & ") || "");
+				text.inputEl.addEventListener("click", () => {
+					void this.openAssigneeSuggest(input);
+				});
+			}).addExtraButton((button) => {
+				button
+					.setIcon("user-plus")
+					.setTooltip(t("modal.assignee") || "Assignee")
+					.onClick(() => {
+						void this.openAssigneeSuggest(input);
+					});
+			}).addExtraButton((button) => {
+				button
+					.setIcon("x")
+					.setTooltip(t("common.clear") || "Clear")
+					.onClick(() => {
+						this.formData.assignee = [];
+						input?.setValue("");
+					});
+			});
+	}
+
+	private async openAssigneeSuggest(input: TextComponent | null): Promise<void> {
+		let knownAssignees: string[] = [];
+		try {
+			knownAssignees = await this.host.api.listAssignees();
+		} catch {
+			// fallback: no known assignees
+		}
+		new AssigneeSuggestModal(this.app, knownAssignees, (value) => {
+			const current = this.formData.assignee;
+			if (!current.includes(value)) {
+				this.formData.assignee = [...current, value];
+			}
+			input?.setValue(this.formData.assignee.join(" & "));
+		}).open();
 	}
 
 	private finish(data: TaskFormData | null): void {

@@ -81,6 +81,7 @@ export interface TaskTodoCoreApi {
 	deleteTask(path: string, lineNumber: number): Promise<boolean>;
 	editTask(path: string, lineNumber: number, patch: EditTaskPatch): Promise<boolean>;
 	executeTasksToggleCommand(line: string, path: string): string;
+	listAssignees(): Promise<string[]>;
 }
 
 export interface TaskTodoHost {
