@@ -385,39 +385,29 @@ export class TaskTodoTaskListView extends ItemView {
         menu.addSeparator();
         menu.addItem((menuItem) => {
           menuItem
-            .setTitle(`${t("task.action.postpone")} ›`)
-            .setIcon("clock")
-            .onClick(() => {});
-          const el = (menuItem as unknown as { dom: HTMLElement }).dom;
-          el.addClass("taskslite-has-submenu");
-          el.addEventListener("mouseenter", () => {
-            const sub = new Menu();
-            sub.addItem((s) => {
-              s.setTitle(t("task.action.postponeDay"))
-                .setIcon("plus")
-                .onClick(() => {
-                  void this.postponeTask(item, currentScheduled, 1);
-                });
+            .setTitle(t("task.action.postponeDay"))
+            .setIcon("plus")
+            .onClick(() => {
+              void this.postponeTask(item, currentScheduled, 1);
             });
-            sub.addItem((s) => {
-              s.setTitle(t("task.action.postponeTomorrow"))
-                .setIcon("sun")
-                .onClick(() => {
-                  const tomorrow = window.moment().add(1, "day").format("YYYY-MM-DD");
-                  void this.postponeToDate(item, tomorrow);
-                });
+        });
+        menu.addItem((menuItem) => {
+          menuItem
+            .setTitle(t("task.action.postponeTomorrow"))
+            .setIcon("sun")
+            .onClick(() => {
+              const tomorrow = window.moment().add(1, "day").format("YYYY-MM-DD");
+              void this.postponeToDate(item, tomorrow);
             });
-            sub.addItem((s) => {
-              s.setTitle(t("task.action.postponeToday"))
-                .setIcon("calendar-check")
-                .onClick(() => {
-                  const today = window.moment().format("YYYY-MM-DD");
-                  void this.postponeToDate(item, today);
-                });
+        });
+        menu.addItem((menuItem) => {
+          menuItem
+            .setTitle(t("task.action.postponeToday"))
+            .setIcon("calendar-check")
+            .onClick(() => {
+              const today = window.moment().format("YYYY-MM-DD");
+              void this.postponeToDate(item, today);
             });
-            const rect = el.getBoundingClientRect();
-            sub.showAtPosition({ x: rect.right, y: rect.top });
-          });
         });
       }
 
