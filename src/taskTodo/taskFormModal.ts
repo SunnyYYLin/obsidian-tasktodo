@@ -1,6 +1,6 @@
 import { App, Modal, Setting, SuggestModal, TFolder, type TextComponent } from "obsidian";
 import { t } from "../i18n";
-import { TASK_SYMBOLS, type TaskTodoHost, type TaskTodoTaskLine } from "../taskLiteInterop";
+import { TASK_SYMBOLS, type TaskTodoHost, type TaskTodoTaskLine, type TaskTodoTaskRecord } from "../taskLiteInterop";
 
 export interface TaskFormData {
 	description: string;
@@ -105,6 +105,38 @@ class TargetFileSuggestModal extends SuggestModal<string> {
 	}
 }
 
+class DependsOnSuggestModal extends SuggestModal<{ id: string; description: string }> {
+	constructor(
+		app: App,
+		private readonly items: Array<{ id: string; description: string }>,
+		private readonly onChoose: (item: { id: string; description: string }) => void,
+	) {
+		super(app);
+		this.setPlaceholder(t("modal.chooseDependsOn") || "Search existing task IDs");
+	}
+
+	getSuggestions(query: string): Array<{ id: string; description: string }> {
+		const normalized = query.trim().toLowerCase();
+		if (!normalized) return this.items;
+		return this.items.filter(
+			(item) =>
+				item.id.toLowerCase().includes(normalized) ||
+				item.description.toLowerCase().includes(normalized)
+		);
+	}
+
+	renderSuggestion(value: { id: string; description: string }, el: HTMLElement): void {
+		el.addClass("taskslite-suggest-item");
+		const container = el.createDiv({ cls: "taskslite-suggest-item-content" });
+		container.createEl("strong", { text: value.id, cls: "taskslite-suggest-id" });
+		container.createEl("span", { text: ` - ${value.description}`, cls: "taskslite-suggest-desc" });
+	}
+
+	onChooseSuggestion(value: { id: string; description: string }): void {
+		this.onChoose(value);
+	}
+}
+
 export class TaskFormModal extends Modal {
 	private readonly formData: TaskFormData;
 	private targetFileValue: string;
@@ -192,8 +224,9 @@ export class TaskFormModal extends Modal {
 		this.addOnCompletionSetting(this.contentEl);
 
 		// 7. Advanced text inputs
-		this.addTextSetting(this.contentEl, `${TASK_SYMBOLS.id} ${t("modal.taskId")}`, "id", "id");
-		this.addTextSetting(this.contentEl, `${TASK_SYMBOLS.dependsOn} ${t("modal.dependsOn")}`, "id1, id2", "dependsOn");
+		this.addTaskIdSetting(this.contentEl);
+		this.addDependsOnSetting(this.contentEl);
+
 
 		// 8. Assignee
 		this.addAssigneeSetting(this.contentEl);
@@ -456,6 +489,94 @@ export class TaskFormModal extends Modal {
 				this.formData.onCompletion = value || null;
 			});
 		});
+	}
+
+	private addTaskIdSetting(container: HTMLElement): void {
+		let input: TextComponent | null = null;
+		const setting = new Setting(container)
+			.setName(`${TASK_SYMBOLS.id} ${t("modal.taskId")}`)
+			.addText((text) => {
+				input = text;
+				text.setValue(this.formData.id || "");
+				text.setPlaceholder(t("modal.taskId")).onChange((value) => {
+					this.formData.id = value || null;
+				});
+			});
+
+		if (typeof this.host.api.generateTaskId === "function") {
+			setting.addExtraButton((button) => {
+				button
+					.setIcon("sparkles")
+					.setTooltip(t("modal.generateId") || "Generate ID")
+					.onClick(() => {
+						const desc = this.formData.description || "";
+						const generated = this.host.api.generateTaskId!(desc, {
+							isRecurring: !!this.formData.recurrence,
+							dueDate: this.formData.dueDate,
+						});
+						this.formData.id = generated;
+						input?.setValue(generated);
+					});
+			});
+		}
+	}
+
+	private addDependsOnSetting(container: HTMLElement): void {
+		let input: TextComponent | null = null;
+		new Setting(container)
+			.setName(`${TASK_SYMBOLS.dependsOn} ${t("modal.dependsOn")}`)
+			.addText((text) => {
+				input = text;
+				text.setValue(this.formData.dependsOn || "");
+				text.setPlaceholder("Id1, id2").onChange((value) => {
+					this.formData.dependsOn = value || null;
+				});
+			})
+			.addExtraButton((button) => {
+				button
+					.setIcon("search")
+					.setTooltip(t("modal.chooseDependsOn") || "Search existing task IDs")
+					.onClick(async () => {
+						let records: TaskTodoTaskRecord[] = [];
+						try {
+							records = await this.host.api.listTasks({
+								includeCompleted: true,
+								includeCancelled: true,
+								includeChildren: true,
+							});
+						} catch {
+							// fallback
+						}
+
+						const itemsMap = new Map<string, string>();
+						for (const record of records) {
+							if (record.task.id) {
+								itemsMap.set(record.task.id, record.task.description);
+							}
+						}
+
+						const items = Array.from(itemsMap.entries()).map(([id, description]) => ({
+							id,
+							description,
+						}));
+
+						new DependsOnSuggestModal(this.app, items, (chosen) => {
+							const current = input?.getValue().trim() || "";
+							let nextVal = "";
+							if (current) {
+								const parts = current.split(",").map((p) => p.trim()).filter(Boolean);
+								if (!parts.includes(chosen.id)) {
+									parts.push(chosen.id);
+								}
+								nextVal = parts.join(", ");
+							} else {
+								nextVal = chosen.id;
+							}
+							this.formData.dependsOn = nextVal;
+							input?.setValue(nextVal);
+						}).open();
+					});
+			});
 	}
 
 	private addTextSetting(

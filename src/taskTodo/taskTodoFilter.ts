@@ -1,4 +1,4 @@
-import type { TaskTodoTaskLine } from "../taskLiteInterop";
+import type { TaskTodoTaskLine, TaskTodoHost } from "../taskLiteInterop";
 import type { FilterConfig, DateFilterField } from "../main";
 import { todayString } from "../taskLiteInterop";
 
@@ -180,6 +180,7 @@ export function preprocessDQLQuery(query: string): string {
 	const nextWeek = window.moment(today, "YYYY-MM-DD").add(7, "days").format("YYYY-MM-DD");
 
 	let result = query;
+	result = result.replace(/\bdate\(\s*["']?today["']?\s*\)/gi, `date("${today}")`);
 	result = result.replace(/\bdate\(\s*["']?tomorrow["']?\s*\)/gi, `date("${tomorrow}")`);
 	result = result.replace(/\bdate\(\s*["']?next-week["']?\s*\)/gi, `date("${nextWeek}")`);
 	return result;
@@ -189,11 +190,11 @@ export function matchFilterWithDQL(
 	item: TaskListItem,
 	filter: FilterConfig | undefined,
 	query: string | undefined,
-	host: any
+	host: TaskTodoHost | undefined | null
 ): boolean {
 	if (query && query.trim() !== "") {
 		const preprocessed = preprocessDQLQuery(query);
-		if (host && host.api && typeof host.api.filterTasks === "function") {
+		if (host?.api?.filterTasks && typeof host.api.filterTasks === "function") {
 			const record = {
 				path: item.path,
 				basename: item.basename,

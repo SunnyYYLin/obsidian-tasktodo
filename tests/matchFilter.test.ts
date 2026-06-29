@@ -289,9 +289,10 @@ describe("matchFilter", () => {
 	});
 
 	describe("matchFilterWithDQL and preprocessDQLQuery", () => {
-		test("preprocessDQLQuery replaces tomorrow and next-week correctly", () => {
-			const query = 'status = "TODO" AND due = date(tomorrow) AND start = date(next-week)';
+		test("preprocessDQLQuery replaces today, tomorrow and next-week correctly", () => {
+			const query = 'status = "TODO" AND due = date(today) AND start = date(tomorrow) AND scheduled = date(next-week)';
 			const preprocessed = preprocessDQLQuery(query);
+			expect(preprocessed).toContain('date("2026-06-01")');
 			expect(preprocessed).toContain('date("2026-06-02")');
 			expect(preprocessed).toContain('date("2026-06-08")');
 		});

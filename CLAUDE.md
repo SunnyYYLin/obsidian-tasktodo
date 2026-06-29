@@ -43,8 +43,10 @@ bun test <name>      # 运行单个测试文件
 
 ### 版本更新与发布约束
 
-- **每次更新版本要发布一个 pre-release**：当代码更改且需要发版时，必须修改版本号（如 `0.2.1-alpha.0` -> `0.2.1-alpha.1`），同步更新 `package.json`、`manifest.json` 和 `versions.json`，运行 `bun run build`，提交推送代码，打上对应的 git tag（如 `v0.2.1-alpha.1`）并推送，最后使用 GitHub CLI 创建 pre-release 并上传构建好的 `main.js`、`manifest.json`、`styles.css` 文件。
-- **发布正式版时删除所有 pre-release**：发布正式版（如 `v0.2.5`）时，先用 `gh release list --limit 50` 列出所有 release，再用 `gh release delete <tag> --yes` 删除该版本所有 pre-release（如 `v0.2.5-alpha.0`、`v0.2.5-alpha.1` 等），然后创建正式 release。
+- **每次更新版本要发布一个 pre-release**：当代码更改且需要发版时，必须修改版本号（如 `0.2.1-beta.0` -> `0.2.1-beta.1`），同步更新 `package.json`、`manifest.json` 和 `versions.json`，运行 `bun run build`，提交推送代码，打上对应的 git tag（不带 v，如 `0.2.1-beta.1`）并推送，最后使用 GitHub CLI 创建 pre-release 并上传构建好的 `main.js`、`manifest.json`、`styles.css` 文件。
+- **发布正式版时删除所有 pre-release**：发布正式版（不带 v，如 `0.2.5`）时，先用 `gh release list --limit 50` 列出所有 release，再用 `gh release delete <tag> --yes` 删除该版本所有 pre-release（如 `0.2.5-beta.0`、`0.2.5-beta.1` 等），然后创建正式 release。
+
+
 
 ### 禁止直接读写笔记文件内容
 

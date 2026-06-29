@@ -82,7 +82,19 @@ export interface TaskTodoCoreApi {
 	editTask(path: string, lineNumber: number, patch: EditTaskPatch): Promise<boolean>;
 	executeTasksToggleCommand(line: string, path: string): string;
 	listAssignees(): Promise<string[]>;
+	generateTaskId?(
+		description: string,
+		options?: {
+			isRecurring?: boolean;
+			dueDate?: string | null;
+		},
+	): string;
+	filterTasks?(
+		records: TaskTodoTaskRecord[],
+		query: string,
+	): TaskTodoTaskRecord[];
 }
+
 
 export interface TaskTodoHost {
 	api: TaskTodoCoreApi;
