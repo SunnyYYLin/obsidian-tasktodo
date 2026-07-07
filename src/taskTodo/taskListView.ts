@@ -60,7 +60,7 @@ export class TaskTodoTaskListView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "TaskTodo"; // eslint-disable-line obsidianmd/ui/sentence-case
+    return "TaskTodo";
   }
 
   getIcon(): string {

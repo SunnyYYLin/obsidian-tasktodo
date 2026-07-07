@@ -4,6 +4,7 @@ import globals from "globals";
 import { globalIgnores } from "eslint/config";
 
 export default tseslint.config(
+	...obsidianmd.configs.recommended,
 	{
 		languageOptions: {
 			globals: {
@@ -20,13 +21,24 @@ export default tseslint.config(
 				extraFileExtensions: ['.json']
 			},
 		},
+		rules: {
+			'@typescript-eslint/no-explicit-any': 'off',
+			'@typescript-eslint/no-misused-promises': 'off',
+			'@typescript-eslint/no-unnecessary-type-assertion': 'off',
+			'@typescript-eslint/no-unsafe-argument': 'off',
+			'@typescript-eslint/no-unsafe-assignment': 'off',
+			'@typescript-eslint/no-unsafe-member-access': 'off',
+			'@typescript-eslint/no-unsafe-return': 'off',
+			'obsidianmd/settings-tab/no-manual-html-headings': 'off',
+			'obsidianmd/ui/sentence-case': 'off',
+		},
 	},
-	...obsidianmd.configs.recommended,
 	globalIgnores([
 		"node_modules",
 		"esbuild.config.mjs",
 		"eslint.config.mts",
 		"versions.json",
 		"main.js",
+		"tests",
 	]),
 );
