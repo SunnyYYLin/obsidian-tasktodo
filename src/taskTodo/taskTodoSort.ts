@@ -75,7 +75,10 @@ function compareDates(left: TaskTodoTaskLine, right: TaskTodoTaskLine): number {
 function parseDateToTimestamp(dateStr: string): number | null {
 	const parts = dateStr.split("-").map((p) => Number.parseInt(p, 10));
 	if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
-	return Date.UTC(parts[0]!, parts[1]! - 1, parts[2]!);
+	const year = parts[0]!;
+	const month = parts[1]!;
+	const day = parts[2]!;
+	return Date.UTC(year, month - 1, day);
 }
 
 function getDateDiffInDays(dateStr: string | null, startStr: string | null): number | null {

@@ -1,4 +1,4 @@
-import type { TaskTodoTaskLine, TaskTodoHost } from "../taskLiteInterop";
+import type { TaskTodoTaskLine, TaskTodoTaskRecord, TaskTodoHost } from "../taskLiteInterop";
 import type { FilterConfig, DateFilterField } from "../main";
 import { todayString } from "../taskLiteInterop";
 
@@ -165,12 +165,22 @@ function matchDateField(dateString: string | null, field: DateFilterField, today
 
 function extractTags(description: string): string[] {
 	const tagRegex = /(^|\s)#[^ !@#$%^&*(),.?":{}|<>]+/g;
-	return Array.from(description.matchAll(tagRegex)).map((match) => match[0].trim());
+	const results: string[] = [];
+	let match: RegExpExecArray | null;
+	while ((match = tagRegex.exec(description)) !== null) {
+		results.push(match[0].trim());
+	}
+	return results;
 }
 
 function extractPeople(description: string): string[] {
 	const peopleRegex = /(^|\s)@[^ !@#$%^&*(),.?":{}|<>]+/g;
-	return Array.from(description.matchAll(peopleRegex)).map((match) => match[0].trim());
+	const results: string[] = [];
+	let match: RegExpExecArray | null;
+	while ((match = peopleRegex.exec(description)) !== null) {
+		results.push(match[0].trim());
+	}
+	return results;
 }
 
 export function preprocessDQLQuery(query: string): string {
@@ -195,7 +205,7 @@ export function matchFilterWithDQL(
 	if (query && query.trim() !== "") {
 		const preprocessed = preprocessDQLQuery(query);
 		if (host?.api?.filterTasks && typeof host.api.filterTasks === "function") {
-			const record = {
+			const record: TaskTodoTaskRecord = {
 				path: item.path,
 				basename: item.basename,
 				lineNumber: item.lineNumber,

@@ -140,8 +140,8 @@ export default class TaskTodoPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    const data = await this.loadData();
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+    const data = await this.loadData() as Partial<TaskTodoSettings> | null;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, data ?? {});
 
     const createDefaultInPlanColumns = (): ColumnConfig[] => [
       {
@@ -304,7 +304,7 @@ class TaskTodoSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: t("settings.title") });
+    new Setting(containerEl).setName(t("settings.title")).setHeading();
 
     // 导入配置按钮
     new Setting(containerEl)
@@ -315,7 +315,7 @@ class TaskTodoSettingTab extends PluginSettingTab {
           .setButtonText(t("settings.import"))
           .setCta()
           .onClick(() => {
-            const input = document.createElement("input");
+            const input = activeDocument.createElement("input");
             input.type = "file";
             input.accept = ".json";
             input.onchange = async () => {
@@ -323,15 +323,15 @@ class TaskTodoSettingTab extends PluginSettingTab {
               if (!file) return;
               try {
                 const text = await file.text();
-                const data = JSON.parse(text);
-                if (Array.isArray(data.tabs)) {
-                  this.plugin.settings.tabs = data.tabs;
+                const raw = JSON.parse(text) as Record<string, unknown>;
+                if (Array.isArray(raw.tabs)) {
+                  this.plugin.settings.tabs = raw.tabs as TabConfig[];
                 }
-                if (Array.isArray(data.sortOrder)) {
-                  this.plugin.settings.sortOrder = data.sortOrder;
+                if (Array.isArray(raw.sortOrder)) {
+                  this.plugin.settings.sortOrder = raw.sortOrder as SortKey[];
                 }
-                if (Array.isArray(data.columns)) {
-                  this.plugin.settings.columns = data.columns;
+                if (Array.isArray(raw.columns)) {
+                  this.plugin.settings.columns = raw.columns as ColumnConfig[];
                 }
                 await this.plugin.saveSettings();
                 new Notice(t("settings.importData.success"));
@@ -408,13 +408,15 @@ class TaskTodoSettingTab extends PluginSettingTab {
         if (index === 0) {
           upBtn.setAttribute("disabled", "true");
         } else {
-          upBtn.addEventListener("click", async (e) => {
+          upBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            const temp = currentKeys[index]!;
-            currentKeys[index] = currentKeys[index - 1]!;
-            currentKeys[index - 1] = temp;
-            await saveKeys(currentKeys);
-            renderList();
+            void (async () => {
+              const temp = currentKeys[index]!;
+              currentKeys[index] = currentKeys[index - 1]!;
+              currentKeys[index - 1] = temp;
+              await saveKeys(currentKeys);
+              renderList();
+            })();
           });
         }
 
@@ -426,13 +428,15 @@ class TaskTodoSettingTab extends PluginSettingTab {
         if (index === currentKeys.length - 1) {
           downBtn.setAttribute("disabled", "true");
         } else {
-          downBtn.addEventListener("click", async (e) => {
+          downBtn.addEventListener("click", (e) => {
             e.stopPropagation();
-            const temp = currentKeys[index]!;
-            currentKeys[index] = currentKeys[index + 1]!;
-            currentKeys[index + 1] = temp;
-            await saveKeys(currentKeys);
-            renderList();
+            void (async () => {
+              const temp = currentKeys[index]!;
+              currentKeys[index] = currentKeys[index + 1]!;
+              currentKeys[index + 1] = temp;
+              await saveKeys(currentKeys);
+              renderList();
+            })();
           });
         }
 
@@ -444,18 +448,20 @@ class TaskTodoSettingTab extends PluginSettingTab {
           itemEl.addClass("is-dragging");
         });
 
-        itemEl.addEventListener("dragend", async () => {
+        itemEl.addEventListener("dragend", () => {
           itemEl.removeClass("is-dragging");
-          const childElements = Array.from(
-            sortContainer.querySelectorAll(".tasktodo-sort-item"),
-          );
-          const newKeys = childElements
-            .map((el) => el.getAttribute("data-key") as SortKey)
-            .filter(Boolean);
+          void (async () => {
+            const childElements = Array.from(
+              sortContainer.querySelectorAll(".tasktodo-sort-item"),
+            );
+            const newKeys = childElements
+              .map((el) => el.getAttribute("data-key") as SortKey)
+              .filter(Boolean);
 
-          currentKeys = newKeys;
-          await saveKeys(currentKeys);
-          renderList();
+            currentKeys = newKeys;
+            await saveKeys(currentKeys);
+            renderList();
+          })();
         });
 
         itemEl.addEventListener("dragover", (e) => {
@@ -478,7 +484,7 @@ class TaskTodoSettingTab extends PluginSettingTab {
     renderList();
 
     // Priority Colors settings
-    containerEl.createEl("h3", { text: t("settings.priorityColors.name") });
+    new Setting(containerEl).setName(t("settings.priorityColors.name")).setHeading();
     new Setting(containerEl).setDesc(t("settings.priorityColors.desc"));
 
     const colors = {
@@ -521,7 +527,7 @@ class TaskTodoSettingTab extends PluginSettingTab {
     }
 
     // Tabs settings
-    containerEl.createEl("h3", { text: t("settings.tabs.title") });
+    new Setting(containerEl).setName(t("settings.tabs.title")).setHeading();
     new Setting(containerEl)
       .setDesc(t("settings.tabs.desc"))
       .addButton((button) =>
@@ -537,16 +543,18 @@ class TaskTodoSettingTab extends PluginSettingTab {
               ),
               columns: [],
             };
-            new TabOrColumnModal(this.app, newTab, async (result) => {
-              const tab: TabConfig = {
-                id: newTab.id,
-                title: result.title,
-                query: result.query,
-                columns: [],
-              };
-              this.plugin.settings.tabs.push(tab);
-              await this.plugin.saveSettings();
-              this.display();
+            new TabOrColumnModal(this.app, newTab, (result) => {
+              void (async () => {
+                const tab: TabConfig = {
+                  id: newTab.id,
+                  title: result.title,
+                  query: result.query,
+                  columns: [],
+                };
+                this.plugin.settings.tabs.push(tab);
+                await this.plugin.saveSettings();
+                this.display();
+              })();
             }).open();
           }),
       );
@@ -578,11 +586,13 @@ class TaskTodoSettingTab extends PluginSettingTab {
         title: t("settings.edit"),
       });
       editTabBtn.addEventListener("click", () => {
-        new TabOrColumnModal(this.app, tab, async (result) => {
-          tab.title = result.title;
-          tab.query = result.query;
-          await this.plugin.saveSettings();
-          this.display();
+        new TabOrColumnModal(this.app, tab, (result) => {
+          void (async () => {
+            tab.title = result.title;
+            tab.query = result.query;
+            await this.plugin.saveSettings();
+            this.display();
+          })();
         }).open();
       });
 
@@ -591,10 +601,12 @@ class TaskTodoSettingTab extends PluginSettingTab {
         text: "❌",
         title: t("settings.delete"),
       });
-      delTabBtn.addEventListener("click", async () => {
-        this.plugin.settings.tabs.splice(tabIndex, 1);
-        await this.plugin.saveSettings();
-        this.display();
+      delTabBtn.addEventListener("click", () => {
+        void (async () => {
+          this.plugin.settings.tabs.splice(tabIndex, 1);
+          await this.plugin.saveSettings();
+          this.display();
+        })();
       });
 
       const colHeader = tabCard.createDiv({ cls: "tasktodo-nested-header" });
@@ -618,15 +630,17 @@ class TaskTodoSettingTab extends PluginSettingTab {
             getEnforcedColumnFilter("col_" + Date.now()),
           ),
         };
-        new TabOrColumnModal(this.app, newCol, async (result) => {
-          const col: ColumnConfig = {
-            id: newCol.id,
-            title: result.title,
-            query: result.query,
-          };
-          tab.columns.push(col);
-          await this.plugin.saveSettings();
-          this.display();
+        new TabOrColumnModal(this.app, newCol, (result) => {
+          void (async () => {
+            const col: ColumnConfig = {
+              id: newCol.id,
+              title: result.title,
+              query: result.query,
+            };
+            tab.columns.push(col);
+            await this.plugin.saveSettings();
+            this.display();
+          })();
         }).open();
       });
 
@@ -659,11 +673,13 @@ class TaskTodoSettingTab extends PluginSettingTab {
         });
         editColBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          new TabOrColumnModal(this.app, col, async (result) => {
-            col.title = result.title;
-            col.query = result.query;
-            await this.plugin.saveSettings();
-            this.display();
+          new TabOrColumnModal(this.app, col, (result) => {
+            void (async () => {
+              col.title = result.title;
+              col.query = result.query;
+              await this.plugin.saveSettings();
+              this.display();
+            })();
           }).open();
         });
 
@@ -672,11 +688,13 @@ class TaskTodoSettingTab extends PluginSettingTab {
           text: "❌",
           title: t("settings.delete"),
         });
-        delColBtn.addEventListener("click", async (e) => {
+        delColBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          tab.columns.splice(colIndex, 1);
-          await this.plugin.saveSettings();
-          this.display();
+          void (async () => {
+            tab.columns.splice(colIndex, 1);
+            await this.plugin.saveSettings();
+            this.display();
+          })();
         });
 
         colEl.addEventListener("dragstart", (e) => {
@@ -688,21 +706,23 @@ class TaskTodoSettingTab extends PluginSettingTab {
           colEl.addClass("is-dragging-column");
         });
 
-        colEl.addEventListener("dragend", async () => {
+        colEl.addEventListener("dragend", () => {
           colEl.removeClass("is-dragging-column");
-          const childElements = Array.from(
-            columnsContainer.querySelectorAll(".tasktodo-sort-item"),
-          );
-          const newCols = childElements
-            .map((el) => {
-              const id = el.getAttribute("data-id");
-              return tab.columns.find((c: ColumnConfig) => c.id === id);
-            })
-            .filter(Boolean) as ColumnConfig[];
+          void (async () => {
+            const childElements = Array.from(
+              columnsContainer.querySelectorAll(".tasktodo-sort-item"),
+            );
+            const newCols = childElements
+              .map((el) => {
+                const id = el.getAttribute("data-id");
+                return tab.columns.find((c: ColumnConfig) => c.id === id);
+              })
+              .filter(Boolean) as ColumnConfig[];
 
-          tab.columns = newCols;
-          await this.plugin.saveSettings();
-          this.display();
+            tab.columns = newCols;
+            await this.plugin.saveSettings();
+            this.display();
+          })();
         });
 
         colEl.addEventListener("dragover", (e) => {
@@ -733,21 +753,23 @@ class TaskTodoSettingTab extends PluginSettingTab {
         tabCard.addClass("is-dragging-tab");
       });
 
-      tabCard.addEventListener("dragend", async () => {
+      tabCard.addEventListener("dragend", () => {
         tabCard.removeClass("is-dragging-tab");
-        const childElements = Array.from(
-          tabsContainer.querySelectorAll(".tasktodo-card"),
-        );
-        const newTabs = childElements
-          .map((el) => {
-            const id = el.getAttribute("data-id");
-            return this.plugin.settings.tabs.find((t) => t.id === id);
-          })
-          .filter(Boolean) as TabConfig[];
+        void (async () => {
+          const childElements = Array.from(
+            tabsContainer.querySelectorAll(".tasktodo-card"),
+          );
+          const newTabs = childElements
+            .map((el) => {
+              const id = el.getAttribute("data-id");
+              return this.plugin.settings.tabs.find((t) => t.id === id);
+            })
+            .filter(Boolean) as TabConfig[];
 
-        this.plugin.settings.tabs = newTabs;
-        await this.plugin.saveSettings();
-        this.display();
+          this.plugin.settings.tabs = newTabs;
+          await this.plugin.saveSettings();
+          this.display();
+        })();
       });
 
       tabCard.addEventListener("dragover", (e) => {
@@ -1196,7 +1218,7 @@ class TabOrColumnModal extends Modal {
             .addOption("completed", "已完成")
             .setValue(this.result.filter.completed)
             .onChange((val) => {
-              this.result.filter.completed = val as any;
+              this.result.filter.completed = val as "all" | "completed" | "uncompleted";
               updateDQL();
             });
         });
@@ -1210,7 +1232,7 @@ class TabOrColumnModal extends Modal {
             .addOption("cancelled", "已取消")
             .setValue(this.result.filter.cancelled)
             .onChange((val) => {
-              this.result.filter.cancelled = val as any;
+              this.result.filter.cancelled = val as "all" | "cancelled" | "uncancelled";
               updateDQL();
             });
         });

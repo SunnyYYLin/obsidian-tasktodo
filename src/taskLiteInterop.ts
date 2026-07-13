@@ -26,7 +26,9 @@ export const TASK_SYMBOLS = {
 
 export function serializeTaskLine(task: TaskTodoTaskLine, registry: { getByType(type: string): { symbol: string } }): string {
 	const symbol = registry.getByType(task.status).symbol || " ";
-	const parts = [task.description.trim()];
+	const parts: string[] = [];
+	const desc = task.description.trim();
+	if (desc) parts.push(desc);
 	if (task.priority) {
 		const emoji = TASK_SYMBOLS.priority[task.priority as keyof typeof TASK_SYMBOLS.priority] || task.priority;
 		parts.push(emoji);
@@ -44,7 +46,8 @@ export function serializeTaskLine(task: TaskTodoTaskLine, registry: { getByType(
 	if (task.id) parts.push(`${TASK_SYMBOLS.id} ${task.id}`);
 	if (task.assignee && task.assignee.length > 0) parts.push(`${TASK_SYMBOLS.assignee} ${task.assignee.join(" & ")}`);
 	if (task.blockLink) parts.push(task.blockLink);
-	return `- [${symbol}] ${parts.filter(Boolean).join(" ")}`.trimEnd();
+	const body = parts.length > 0 ? ` ${parts.join(" ")}` : "";
+	return `- [${symbol}]${body}`;
 }
 
 export function todayString(): string {
